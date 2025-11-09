@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36623.8 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebsiteImagePilfer", "WebsiteImagePilfer.csproj", "{1D8960EC-CB0C-415C-8658-737CE77CF63A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1D8960EC-CB0C-415C-8658-737CE77CF63A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1D8960EC-CB0C-415C-8658-737CE77CF63A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1D8960EC-CB0C-415C-8658-737CE77CF63A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1D8960EC-CB0C-415C-8658-737CE77CF63A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {91B4CC49-37B0-4A8F-82CA-B2FAFD6704E6}
+	EndGlobalSection
+EndGlobal

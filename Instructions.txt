@@ -1,0 +1,158 @@
+﻿# Project: WebsiteImagePilfer
+# Goal: Create a WPF application that can scan a given webpage for images and download them locally.
+
+---
+
+## Step 1 — UI Layout (MainWindow.xaml)
+
+Create a clean and simple UI layout for the main window:
+- Title: "Website Image Pilfer"
+- Window size: 900x600
+- Layout structure:
+  - Top row: A TextBox for the user to enter a webpage URL (stretch across window width)
+  - To the right of the TextBox: A Button labeled “Scan & Download”
+  - Below: A ProgressBar for showing download progress
+  - Main area: A ListBox (or ListView) showing the names/URLs of images being downloaded
+  - Bottom row: A StatusBar or TextBlock showing status messages (e.g., “Downloading 3/20...”)
+
+Example structure (you can auto-generate with XAML Grid layout):
+---------------------------------------------------------------
+<TextBox x:Name="UrlTextBox" PlaceholderText="Enter webpage URL..." />
+<Button x:Name="ScanButton" Content="Scan & Download" />
+<ProgressBar x:Name="DownloadProgress" />
+<ListView x:Name="ImageList" />
+<TextBlock x:Name="StatusText" />
+---------------------------------------------------------------
+
+---
+
+## Step 2 — Project Setup
+
+In MainWindow.xaml.cs:
+
+1. Add async/await support for downloading.
+2. Install NuGet packages:
+   - HtmlAgilityPack
+   - CommunityToolkit.Mvvm (optional, for cleaner MVVM structure)
+   - System.Net.Http (included by default)
+
+---
+
+## Step 3 — Logic for Fetching and Parsing HTML
+
+Add a method:
+```csharp
+private async Task<List<string>> GetImageUrlsAsync(string url)
+
+This should:
+- Use HttpClient to download the HTML.
+- Load it into an HtmlDocument (HtmlAgilityPack).
+- Extract all <img src="..."> values.
+- Normalize relative URLs using the page’s base address.
+- Return a list of unique image URLs.
+
+## Step 4 — Logic for Downloading Images
+
+Add a method:
+
+**Method:** `private async Task DownloadImagesAsync(List<string> imageUrls)`
+
+**Purpose:**
+
+* Create a folder named “Downloads” in the project directory (if not exists).
+* Download each image asynchronously using HttpClient.
+* Save images to disk using `File.WriteAllBytesAsync()`.
+* Update the ProgressBar and ListView with each file.
+* Wrap downloads in try/catch to skip broken links.
+
+**Implementation Details:**
+
+* Loop through the image URL list.
+* For each image:
+
+  * Extract the file name from the URL.
+  * Sanitize it if it contains invalid characters.
+  * Display progress visually using the ProgressBar.
+  * Update a status message in the UI (e.g., “Downloading 3 of 42...”).
+
+---
+
+## Step 5 — Event Handling
+
+**UI Interactions:**
+
+* `ScanButton.Click` should call `GetImageUrlsAsync()` then `DownloadImagesAsync()`.
+* Disable `ScanButton` while downloads are active.
+* Update `StatusText` as progress occurs.
+
+**Example Flow:**
+
+1. User enters a URL.
+2. Clicks “Scan & Download”.
+3. App fetches image URLs.
+4. Downloads images sequentially.
+5. Re-enables button when finished.
+
+---
+
+## Step 6 — Optional Enhancements
+
+Ideas for improvement:
+
+**A. Thumbnails**
+
+* Display thumbnail previews in the ListView using WPF Image controls.
+
+**B. Cancel Option**
+
+* Add a “Cancel” button that uses a `CancellationTokenSource` to stop downloads mid-process.
+
+**C. Advanced Settings**
+
+* User-selectable save directory.
+* Option to filter by image size (ignore small icons).
+* Checkboxes for file type filters (e.g., only JPG, PNG).
+* Toggle for “recursive scan” (to include linked subpages in the future).
+
+---
+
+## Step 7 — Testing
+
+**Testing Plan:**
+
+1. Test common sites such as Wikipedia, Unsplash, and random blogs.
+2. Confirm images are correctly saved to the Downloads folder.
+3. Verify that:
+
+   * Progress bar behaves correctly.
+   * Status text updates properly.
+   * Invalid URLs do not crash the app.
+   * Duplicate URLs are skipped.
+
+**Edge Cases:**
+
+* Empty URL field.
+* Broken or protected images.
+* Pages requiring authentication.
+
+---
+
+## Step 8 — Next Steps
+
+Once the baseline works, expand functionality:
+
+* Add a simple settings dialog window.
+* Remember download location using `Properties.Settings`.
+* Add a small console or log panel at the bottom of the window.
+* Implement dark/light mode toggle.
+* Add error logging for skipped files.
+
+**Future Features:**
+
+* Recursive scanning (follow links to subpages).
+* Parallel downloads (limit to 3–5 at once).
+* Built-in image previewer in-app.
+
+---
+
+End of Copilot instructions for steps 4–8.
