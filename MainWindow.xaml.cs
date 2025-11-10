@@ -139,7 +139,7 @@ if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add
             {
                 _lastPreviewColumnWidth = PreviewColumn.ActualWidth;
                 StatusText.Text = "Reloading previews at new resolution...";
-      
+
                 // Reload all previews in the current page with new column width
                 await ReloadAllPreviewsAsync();
     
@@ -1756,30 +1756,37 @@ private void LoadCurrentPage()
         private void ApplyStatusFilter()
         {
         // Safety check: Ensure checkboxes are initialized
-         if (FilterReadyCheckBox == null || FilterDoneCheckBox == null || 
+    if (FilterReadyCheckBox == null || FilterDoneCheckBox == null || 
         FilterBackupCheckBox == null || FilterDuplicateCheckBox == null ||
       FilterFailedCheckBox == null || FilterSkippedCheckBox == null ||
      FilterCancelledCheckBox == null || FilterDownloadingCheckBox == null)
-    {
+  {
        // Checkboxes not yet initialized, skip filtering
      return;
-       }
+   }
 
-        // Safety check: Ensure collections are initialized
+// Safety check: Ensure collections are initialized
          if (_filteredImageItems == null || _imageItems == null)
             {
   return;
  }
 
+          // Track the first visible item to maintain position after filtering
+  ImageDownloadItem? firstVisibleItem = null;
+       if (_currentPageItems.Count > 0)
+          {
+     firstVisibleItem = _currentPageItems[0];
+          }
+
           _filteredImageItems.Clear();
 
-        foreach (var item in _imageItems)
+      foreach (var item in _imageItems)
     {
  bool include = false;
 
-       // Check each filter
-         if (FilterReadyCheckBox.IsChecked == true && item.Status == "Ready")
-          include = true;
+   // Check each filter
+ if (FilterReadyCheckBox.IsChecked == true && item.Status == "Ready")
+       include = true;
  else if (FilterDoneCheckBox.IsChecked == true && item.Status == "✓ Done")
      include = true;
    else if (FilterBackupCheckBox.IsChecked == true && item.Status == "✓ Backup")
@@ -1788,13 +1795,13 @@ include = true;
  include = true;
        else if (FilterFailedCheckBox.IsChecked == true && item.Status == "✗ Failed")
     include = true;
-        else if (FilterSkippedCheckBox.IsChecked == true && item.Status.Contains("⊘ Skipped"))
-        include = true;
+      else if (FilterSkippedCheckBox.IsChecked == true && item.Status.Contains("⊘ Skipped"))
+include = true;
     else if (FilterCancelledCheckBox.IsChecked == true && item.Status == "⊘ Canceled")
     include = true;
     else if (FilterDownloadingCheckBox.IsChecked == true && 
     (item.Status == "Downloading..." || item.Status == "Checking..." || item.Status == "Finding full-res..."))
-      include = true;
+  include = true;
 
   if (include)
  {
@@ -1802,9 +1809,28 @@ include = true;
   }
 }
 
-            // Reset to page 1 and update pagination
-       _currentPage = 1;
-         UpdatePagination();
+            // Try to maintain position by finding where the first visible item is now
+        if (firstVisibleItem != null)
+       {
+     int newIndex = _filteredImageItems.IndexOf(firstVisibleItem);
+        if (newIndex >= 0)
+           {
+        // Calculate which page this item is now on
+        _currentPage = (newIndex / _itemsPerPage) + 1;
+      }
+ else
+         {
+   // Item was filtered out, try to stay on the same page number if possible
+      // Keep current page, will be validated in UpdatePagination
+       }
+    }
+  else
+    {
+    // No items were visible, reset to page 1
+        _currentPage = 1;
+            }
+
+        UpdatePagination();
 }
 
         private void PrevPageButton_Click(object sender, RoutedEventArgs e)
