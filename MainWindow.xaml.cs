@@ -1162,8 +1162,22 @@ try
 
      // Final comprehensive extraction
    var renderedHtml = driver.PageSource;
-        var debugPath = IOPath.Combine(_downloadFolder, "debug_rendered_page.html");
- File.WriteAllText(debugPath, renderedHtml);
+        
+        // Write debug HTML file (only if download folder exists or can be created)
+        try
+        {
+            if (!Directory.Exists(_downloadFolder))
+            {
+                Directory.CreateDirectory(_downloadFolder);
+            }
+            var debugPath = IOPath.Combine(_downloadFolder, "debug_rendered_page.html");
+            File.WriteAllText(debugPath, renderedHtml);
+        }
+        catch
+        {
+            // If we can't write the debug file, continue anyway
+            System.Diagnostics.Debug.WriteLine("Could not write debug HTML file");
+        }
 
 var htmlDoc = new HtmlDocument();
 htmlDoc.LoadHtml(renderedHtml);
