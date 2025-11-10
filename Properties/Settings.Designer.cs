@@ -46,5 +46,125 @@ namespace WebsiteImagePilfer.Properties {
                 this["LastUrl"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool FilterBySize {
+            get {
+                return ((bool)(this["FilterBySize"]));
+            }
+            set {
+                this["FilterBySize"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("5000")]
+        public int MinimumImageSize {
+            get {
+                return ((int)(this["MinimumImageSize"]));
+            }
+            set {
+                this["MinimumImageSize"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ShowThumbnails {
+            get {
+                return ((bool)(this["ShowThumbnails"]));
+            }
+            set {
+                this["ShowThumbnails"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool LoadPreviews {
+            get {
+                return ((bool)(this["LoadPreviews"]));
+            }
+            set {
+                this["LoadPreviews"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool FilterJpgOnly {
+            get {
+                return ((bool)(this["FilterJpgOnly"]));
+            }
+            set {
+                this["FilterJpgOnly"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool FilterPngOnly {
+            get {
+                return ((bool)(this["FilterPngOnly"]));
+            }
+            set {
+                this["FilterPngOnly"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool SkipFullResolutionCheck {
+            get {
+                return ((bool)(this["SkipFullResolutionCheck"]));
+            }
+            set {
+                this["SkipFullResolutionCheck"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool LimitScanCount {
+            get {
+                return ((bool)(this["LimitScanCount"]));
+            }
+            set {
+                this["LimitScanCount"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("20")]
+        public int MaxImagesToScan {
+            get {
+                return ((int)(this["MaxImagesToScan"]));
+            }
+            set {
+                this["MaxImagesToScan"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("50")]
+        public int ItemsPerPage {
+            get {
+                return ((int)(this["ItemsPerPage"]));
+            }
+            set {
+                this["ItemsPerPage"] = value;
+            }
+        }
     }
 }

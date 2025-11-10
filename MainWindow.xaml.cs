@@ -48,16 +48,17 @@ namespace WebsiteImagePilfer
 _httpClient = new HttpClient();
     _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
    _httpClient.Timeout = TimeSpan.FromSeconds(30);
-      _imageItems = new ObservableCollection<ImageDownloadItem>();
-      _currentPageItems = new ObservableCollection<ImageDownloadItem>();
+_imageItems = new ObservableCollection<ImageDownloadItem>();
+    _currentPageItems = new ObservableCollection<ImageDownloadItem>();
  ImageList.ItemsSource = _currentPageItems; // Bind to current page items
     _scannedImageUrls = new List<string>();
   
      // Load settings
    _settings = new DownloadSettings();
-        
+        _settings.LoadFromSettings(); // Load persisted settings
+    
   // Apply items per page from settings
-      _itemsPerPage = _settings.ItemsPerPage;
+  _itemsPerPage = _settings.ItemsPerPage;
 
    // Set default download folder from settings or use default
     _downloadFolder = string.IsNullOrEmpty(Properties.Settings.Default.DownloadFolder)
@@ -67,7 +68,7 @@ _httpClient = new HttpClient();
     
 // Load last URL if available
   if (!string.IsNullOrEmpty(Properties.Settings.Default.LastUrl))
-       {
+ {
   UrlTextBox.Text = Properties.Settings.Default.LastUrl;
   }
 
@@ -1311,7 +1312,10 @@ Verb = "open"
  var settingsWindow = new SettingsWindow(_settings);
   if (settingsWindow.ShowDialog() == true)
 {
-          // Settings were updated
+     // Settings were updated and saved by the dialog
+   
+  // Save to persistent storage
+        _settings.SaveToSettings();
 
   // Apply items per page if it changed
  if (_itemsPerPage != _settings.ItemsPerPage)
@@ -1323,7 +1327,7 @@ Verb = "open"
         UpdatePagination();
         }
      
-     StatusText.Text = "Settings updated.";
+   StatusText.Text = "Settings saved.";
     }
         }
 
@@ -1609,7 +1613,38 @@ public string Status
    public bool LimitScanCount { get; set; } = false;
      public int MaxImagesToScan { get; set; } = 20; // Default: scan 20 images
      public bool LoadPreviews { get; set; } = true; // Load preview images during scan
-        public int ItemsPerPage { get; set; } = 50; // Items per page in pagination
+     public int ItemsPerPage { get; set; } = 50; // Items per page in pagination
+
+     // Load settings from application settings
+        public void LoadFromSettings()
+        {
+            FilterBySize = Properties.Settings.Default.FilterBySize;
+            MinimumImageSize = Properties.Settings.Default.MinimumImageSize;
+     ShowThumbnails = Properties.Settings.Default.ShowThumbnails;
+            LoadPreviews = Properties.Settings.Default.LoadPreviews;
+FilterJpgOnly = Properties.Settings.Default.FilterJpgOnly;
+   FilterPngOnly = Properties.Settings.Default.FilterPngOnly;
+         SkipFullResolutionCheck = Properties.Settings.Default.SkipFullResolutionCheck;
+ LimitScanCount = Properties.Settings.Default.LimitScanCount;
+ MaxImagesToScan = Properties.Settings.Default.MaxImagesToScan;
+   ItemsPerPage = Properties.Settings.Default.ItemsPerPage;
+        }
+
+     // Save settings to application settings
+        public void SaveToSettings()
+        {
+            Properties.Settings.Default.FilterBySize = FilterBySize;
+      Properties.Settings.Default.MinimumImageSize = MinimumImageSize;
+        Properties.Settings.Default.ShowThumbnails = ShowThumbnails;
+    Properties.Settings.Default.LoadPreviews = LoadPreviews;
+  Properties.Settings.Default.FilterJpgOnly = FilterJpgOnly;
+     Properties.Settings.Default.FilterPngOnly = FilterPngOnly;
+            Properties.Settings.Default.SkipFullResolutionCheck = SkipFullResolutionCheck;
+       Properties.Settings.Default.LimitScanCount = LimitScanCount;
+            Properties.Settings.Default.MaxImagesToScan = MaxImagesToScan;
+     Properties.Settings.Default.ItemsPerPage = ItemsPerPage;
+        Properties.Settings.Default.Save();
+}
   }
 
     // Converter to get the index of a ListView item
