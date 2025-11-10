@@ -332,31 +332,44 @@ Directory.CreateDirectory(_downloadFolder);
  try
    {
   item.Status = "Finding full-res...";
-          var fullResStart = DateTime.Now;
-     var fullResUrl = await TryFindFullResolutionUrlAsync(item.Url, cancellationToken);
-     var fullResElapsed = (DateTime.Now - fullResStart).TotalMilliseconds;
+       var fullResStart = DateTime.Now;
+var fullResUrl = await TryFindFullResolutionUrlAsync(item.Url, cancellationToken);
+   var fullResElapsed = (DateTime.Now - fullResStart).TotalMilliseconds;
   
-        // LOG: Full-res check timing
+      // LOG: Full-res check timing
         StatusText.Dispatcher.Invoke(() => 
-        StatusText.Text = $"Full-res check took {fullResElapsed}ms for {item.FileName}");
+     StatusText.Text = $"Full-res check took {fullResElapsed}ms for {item.FileName}");
      
-  if (fullResUrl != null)
+  if (fullResUrl != null && fullResUrl != item.Url)
     {
+        // Found a DIFFERENT full-res URL (transformation succeeded)
  urlToDownload = fullResUrl;
+  usedBackup = false;
   }
+           else if (fullResUrl == item.Url)
+   {
+        // URL is already full-res (no transformation needed)
+   usedBackup = false;
+           }
    else
   {
+    // No full-res found, using original preview URL as backup
     usedBackup = true;
   }
  }
-  catch (Exception ex)
+catch (Exception ex)
   {
    // LOG: Full-res check error
      StatusText.Dispatcher.Invoke(() => 
   StatusText.Text = $"Full-res check failed: {ex.Message}");
-    usedBackup = true;
+    usedBackup = true; // Error finding full-res, using backup
    }
  }
+    else
+    {
+   // Skip check is enabled, using whatever URL we scanned
+          usedBackup = false;
+      }
 
  // USE THE FILENAME WE ALREADY HAVE from the scan!
           // Don't re-extract it from the URL
@@ -450,13 +463,13 @@ catch
 
    if (usedBackup)
   {
-  item.Status = "✓ Backup";
-    }
+  item.Status = "✓ Backup"; // Used preview/original URL because full-res wasn't found
+ }
  else
  {
-    item.Status = "✓ Done";
+    item.Status = "✓ Done"; // Successfully downloaded (full-res if available)
  }
-  
+
     var totalElapsed = (DateTime.Now - startTime).TotalMilliseconds;
       // LOG: Total time
      System.Diagnostics.Debug.WriteLine($"Downloaded {fileName} in {totalElapsed}ms (download: {downloadElapsed}ms)");
@@ -814,13 +827,22 @@ return imageUrls.ToList();
    {
   // KEMONO.CR SPECIFIC PATTERN - NO HEAD REQUEST NEEDED
       // Preview: https://img.kemono.cr/thumbnail/data/...
-      // Full:    https://n4.kemono.cr/data/...?f=filename
-      if (previewUrl.Contains("kemono.cr") && previewUrl.Contains("/thumbnail/"))
-   {
-  // Remove "/thumbnail/" and change subdomain from "img" to "n4"
+   // Full:    https://n4.kemono.cr/data/...?f=filename
+      if (previewUrl.Contains("kemono.cr"))
+ {
+        if (previewUrl.Contains("/thumbnail/"))
+    {
+       // Transform preview to full-res
   var fullResUrl = previewUrl.Replace("/thumbnail/", "/").Replace("img.kemono.cr", "n4.kemono.cr");
-         System.Diagnostics.Debug.WriteLine($"Kemono.cr pattern detected, using full-res URL without HEAD check");
-       return fullResUrl; // Return directly without testing
+         System.Diagnostics.Debug.WriteLine($"Kemono.cr preview detected, transforming to full-res URL");
+       return fullResUrl;
+       }
+     else if (previewUrl.Contains("n4.kemono.cr") || previewUrl.Contains("n5.kemono.cr"))
+   {
+     // Already a full-res URL (n4/n5 subdomain)
+     System.Diagnostics.Debug.WriteLine($"Kemono.cr full-res URL detected (already full-res)");
+     return previewUrl; // Return same URL to indicate it's already full-res
+       }
  }
 
   // Pattern 1: Remove "/thumbnail/" from path (generic pattern)
@@ -830,40 +852,41 @@ return imageUrls.ToList();
   if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
    {
    return fullResUrl;
-     }
+ }
     }
 
-     // Pattern 2: Remove size suffixes
-          var sizePatterns = new[] { "_800x800", "_small", "_medium", "_thumb", "_preview", "-thumb", "-preview" };
-           foreach (var pattern in sizePatterns)
+   // Pattern 2: Remove size suffixes
+   var sizePatterns = new[] { "_800x800", "_small", "_medium", "_thumb", "_preview", "-thumb", "-preview" };
+         foreach (var pattern in sizePatterns)
  {
-      if (previewUrl.Contains(pattern))
+    if (previewUrl.Contains(pattern))
    {
       var fullResUrl = previewUrl.Replace(pattern, "");
    if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
     {
        return fullResUrl;
  }
-         }
+       }
  }
 
-      // Pattern 3: Replace "thumb" or "preview" with empty
+   // Pattern 3: Replace "thumb" or "preview" with empty
       if (previewUrl.Contains("thumb") || previewUrl.Contains("preview"))
    {
       var fullResUrl = previewUrl.Replace("thumb", "").Replace("preview", "");
-          if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
-              {
+       if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
+      {
   return fullResUrl;
     }
     }
 
-      // No full-resolution found
-return null;
+      // No transformation needed/found - return original URL
+        System.Diagnostics.Debug.WriteLine($"No full-res pattern found, URL is likely already full-res or no transformation available");
+return previewUrl; // Return original URL (it's likely already full-res from scan)
         }
-         catch (Exception ex)
+       catch (Exception ex)
     {
      System.Diagnostics.Debug.WriteLine($"TryFindFullResolutionUrlAsync exception: {ex.Message}");
-return null;
+  return previewUrl; // On error, assume URL is fine as-is
  }
   }
 
