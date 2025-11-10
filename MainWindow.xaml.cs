@@ -123,22 +123,22 @@ StatusText.Text = "Scan cancelled.";
 
  // Display found images in list (without downloading)
         foreach (var imageUrl in _scannedImageUrls)
-     {
+   {
       var uri = new Uri(imageUrl);
     var fileName = "";
 
   // KEMONO.CR: Check for ?f= query parameter (contains actual filename)
   if (uri.Query.Contains("?f=") || uri.Query.Contains("&f="))
-      {
+    {
           var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
-         var fParam = queryParams["f"];
+   var fParam = queryParams["f"];
       if (!string.IsNullOrEmpty(fParam))
         {
 fileName = fParam;
   }
-    }
+  }
 
-           // Fallback to path filename if no query parameter
+     // Fallback to path filename if no query parameter
      if (string.IsNullOrEmpty(fileName))
        {
   fileName = IOPath.GetFileName(uri.LocalPath);
@@ -150,7 +150,7 @@ fileName = fParam;
  fileName = $"image_{_imageItems.Count + 1}.jpg";
    }
 
-      fileName = SanitizeFileName(fileName);
+   fileName = SanitizeFileName(fileName);
 
             // Check for duplicates - if limit is enabled and this is a duplicate, skip it
   var filePath = IOPath.Combine(_downloadFolder, fileName);
@@ -158,20 +158,34 @@ fileName = fParam;
       {
      // Skip duplicate, continue to next image
        continue;
-            }
+        }
 
        var item = new ImageDownloadItem
     {
-          Url = imageUrl,
+ Url = imageUrl,
     Status = "Ready",
    FileName = fileName
       };
        _imageItems.Add(item);
 
+            // Load preview image asynchronously if enabled (don't wait, let it load in background)
+if (_settings.LoadPreviews)
+     {
+  _ = Task.Run(async () =>
+ {
+     var preview = await LoadPreviewImageAsync(imageUrl);
+       if (preview != null)
+     {
+       // Update UI on dispatcher thread
+      Dispatcher.Invoke(() => item.PreviewImage = preview);
+          }
+   });
+   }
+
   // Check if we've reached the scan limit
     if (_settings.LimitScanCount && _imageItems.Count >= _settings.MaxImagesToScan)
       {
-        break; // Stop adding more images
+break; // Stop adding more images
   }
      }
 
@@ -1189,17 +1203,45 @@ Directory.Delete(newFolderPath);
         {
    // Remove invalid path characters
  var invalidChars = IOPath.GetInvalidFileNameChars();
- var sanitized = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
+    var sanitized = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
      
-         // Ensure filename is not too long (max 200 characters)
+            // Ensure filename is not too long (max 200 characters)
  if (sanitized.Length > 200)
      {
-  var extension = IOPath.GetExtension(sanitized);
+ var extension = IOPath.GetExtension(sanitized);
       sanitized = sanitized.Substring(0, 200 - extension.Length) + extension;
-    }
+ }
  
      return sanitized;
       }
+
+        private async Task<BitmapImage?> LoadPreviewImageAsync(string imageUrl)
+ {
+ try
+            {
+                // Download image data
+            var imageBytes = await _httpClient.GetByteArrayAsync(imageUrl);
+      
+           // Create BitmapImage from bytes
+     var bitmap = new BitmapImage();
+        using (var stream = new MemoryStream(imageBytes))
+         {
+   bitmap.BeginInit();
+             bitmap.CacheOption = BitmapCacheOption.OnLoad;
+              bitmap.StreamSource = stream;
+         bitmap.DecodePixelWidth = 60; // Thumbnail size
+  bitmap.EndInit();
+                    bitmap.Freeze(); // Make it cross-thread accessible
+    }
+         
+     return bitmap;
+            }
+     catch
+       {
+    // If preview fails, return null (will show no preview)
+       return null;
+         }
+        }
 
         private void UpdatePagination()
   {
@@ -1248,39 +1290,39 @@ Directory.Delete(newFolderPath);
  if (_currentPage < _totalPages)
    {
      _currentPage++;
-       UpdatePagination();
+    UpdatePagination();
     }
  }
 
-  private async Task<string?> TryFindFullResolutionUrlAsync(string previewUrl, CancellationToken cancellationToken)
+     private async Task<string?> TryFindFullResolutionUrlAsync(string previewUrl, CancellationToken cancellationToken)
         {
   try
    {
   // KEMONO.CR SPECIFIC PATTERN - NO HEAD REQUEST NEEDED
       // Preview: https://img.kemono.cr/thumbnail/data/...
-   // Full:    https://n4.kemono.cr/data/...?f=filename
+  // Full:    https://n4.kemono.cr/data/...?f=filename
       if (previewUrl.Contains("kemono.cr"))
  {
         if (previewUrl.Contains("/thumbnail/"))
-    {
+   {
        // Transform preview to full-res
   var fullResUrl = previewUrl.Replace("/thumbnail/", "/").Replace("img.kemono.cr", "n4.kemono.cr");
-         System.Diagnostics.Debug.WriteLine($"Kemono.cr preview detected, transforming to full-res URL");
+      System.Diagnostics.Debug.WriteLine($"Kemono.cr preview detected, transforming to full-res URL");
        return fullResUrl;
        }
-     else if (previewUrl.Contains("n4.kemono.cr") || previewUrl.Contains("n5.kemono.cr"))
+ else if (previewUrl.Contains("n4.kemono.cr") || previewUrl.Contains("n5.kemono.cr"))
    {
      // Already a full-res URL (n4/n5 subdomain)
      System.Diagnostics.Debug.WriteLine($"Kemono.cr full-res URL detected (already full-res)");
-     return previewUrl; // Return same URL to indicate it's already full-res
-       }
+return previewUrl; // Return same URL to indicate it's already full-res
+   }
  }
 
   // Pattern 1: Remove "/thumbnail/" from path (generic pattern)
       if (previewUrl.Contains("/thumbnail/"))
     {
    var fullResUrl = previewUrl.Replace("/thumbnail/", "/");
-  if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
+if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
    {
    return fullResUrl;
  }
@@ -1288,7 +1330,7 @@ Directory.Delete(newFolderPath);
 
    // Pattern 2: Remove size suffixes
    var sizePatterns = new[] { "_800x800", "_small", "_medium", "_thumb", "_preview", "-thumb", "-preview" };
-         foreach (var pattern in sizePatterns)
+      foreach (var pattern in sizePatterns)
  {
     if (previewUrl.Contains(pattern))
    {
@@ -1304,14 +1346,14 @@ Directory.Delete(newFolderPath);
       if (previewUrl.Contains("thumb") || previewUrl.Contains("preview"))
    {
       var fullResUrl = previewUrl.Replace("thumb", "").Replace("preview", "");
-       if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
+   if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
       {
   return fullResUrl;
     }
     }
 
       // No transformation needed/found - return original URL
-        System.Diagnostics.Debug.WriteLine($"No full-res pattern found, URL is likely already full-res or no transformation available");
+  System.Diagnostics.Debug.WriteLine($"No full-res pattern found, URL is likely already full-res or no transformation available");
 return previewUrl; // Return original URL (it's likely already full-res from scan)
         }
        catch (Exception ex)
@@ -1327,8 +1369,8 @@ return previewUrl; // Return original URL (it's likely already full-res from sca
  {
        var testStart = DateTime.Now;
    var request = new HttpRequestMessage(HttpMethod.Head, url);
-       
-          // Add timeout for HEAD request (5 seconds max)
+ 
+// Add timeout for HEAD request (5 seconds max)
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
      using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
  
@@ -1354,53 +1396,60 @@ return previewUrl; // Return original URL (it's likely already full-res from sca
 
     public class ImageDownloadItem : INotifyPropertyChanged
     {
-        private string _url = "";
-        private string _status = "";
+private string _url = "";
+   private string _status = "";
         private string _fileName = "";
         private string? _thumbnailPath;
         private string _errorMessage = "";
+   private BitmapImage? _previewImage;
 
 public string Url
         {
-      get => _url;
+    get => _url;
       set { _url = value; OnPropertyChanged(nameof(Url)); }
-     }
+}
 
-  public string Status
-        {
-        get => _status;
-          set { _status = value; OnPropertyChanged(nameof(Status)); }
+public string Status
+      {
+     get => _status;
+ set { _status = value; OnPropertyChanged(nameof(Status)); }
     }
 
-      public string FileName
-        {
-          get => _fileName;
+   public string FileName
+{
+     get => _fileName;
   set { _fileName = value; OnPropertyChanged(nameof(FileName)); }
-    }
+  }
 
  public string? ThumbnailPath
  {
-            get => _thumbnailPath;
+   get => _thumbnailPath;
  set { _thumbnailPath = value; OnPropertyChanged(nameof(ThumbnailPath)); }
   }
 
-        public string ErrorMessage
-        {
-            get => _errorMessage;
+    public string ErrorMessage
+ {
+ get => _errorMessage;
    set { _errorMessage = value; OnPropertyChanged(nameof(ErrorMessage)); }
       }
 
-      public event PropertyChangedEventHandler? PropertyChanged;
+  public BitmapImage? PreviewImage
+   {
+ get => _previewImage;
+ set { _previewImage = value; OnPropertyChanged(nameof(PreviewImage)); }
+   }
+
+   public event PropertyChangedEventHandler? PropertyChanged;
 
    protected virtual void OnPropertyChanged(string propertyName)
         {
-    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+  PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 
     public class DownloadSettings
     {
-        public bool FilterBySize { get; set; } = false;
+     public bool FilterBySize { get; set; } = false;
    public int MinimumImageSize { get; set; } = 5000; // 5KB minimum
         public bool ShowThumbnails { get; set; } = true;
         public bool FilterJpgOnly { get; set; } = false;
@@ -1408,14 +1457,15 @@ public string Url
  public bool SkipFullResolutionCheck { get; set; } = false;
    public bool LimitScanCount { get; set; } = false;
      public int MaxImagesToScan { get; set; } = 20; // Default: scan 20 images
+        public bool LoadPreviews { get; set; } = true; // Load preview images during scan
   }
 
     // Converter to get the index of a ListView item
-    public class ListViewIndexConverter : IValueConverter
+ public class ListViewIndexConverter : IValueConverter
     {
     public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-        {
-            if (value is ListViewItem listViewItem)
+   {
+       if (value is ListViewItem listViewItem)
  {
    var listView = FindParent<ListView>(listViewItem);
   if (listView != null)
@@ -1435,7 +1485,7 @@ public string Url
   }
 
  public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-        {
+   {
   throw new NotImplementedException();
  }
 

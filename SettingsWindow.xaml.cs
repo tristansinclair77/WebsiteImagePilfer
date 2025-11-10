@@ -20,6 +20,7 @@ namespace WebsiteImagePilfer
             SkipFullResCheckBox.IsChecked = _settings.SkipFullResolutionCheck;
             LimitScanCheckBox.IsChecked = _settings.LimitScanCount;
             MaxImagesSlider.Value = _settings.MaxImagesToScan;
+            LoadPreviewsCheckBox.IsChecked = _settings.LoadPreviews;
         }
 
         private void OkButton_Click(object sender, RoutedEventArgs e)
@@ -33,6 +34,7 @@ namespace WebsiteImagePilfer
             _settings.SkipFullResolutionCheck = SkipFullResCheckBox.IsChecked == true;
             _settings.LimitScanCount = LimitScanCheckBox.IsChecked == true;
             _settings.MaxImagesToScan = (int)MaxImagesSlider.Value;
+            _settings.LoadPreviews = LoadPreviewsCheckBox.IsChecked == true;
 
             // Validate file type filters
             if (_settings.FilterJpgOnly && _settings.FilterPngOnly)

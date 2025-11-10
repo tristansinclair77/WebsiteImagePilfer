@@ -160,9 +160,9 @@ IsReadOnly="True"/>
        <GridViewColumn Header="Preview" Width="80">
         <GridViewColumn.CellTemplate>
     <DataTemplate>
- <Image Source="{Binding ThumbnailPath}" 
+ <Image Source="{Binding PreviewImage}" 
   Width="60" 
-       Height="60" 
+     Height="60" 
    Stretch="Uniform"
   Margin="2"/>
   </DataTemplate>

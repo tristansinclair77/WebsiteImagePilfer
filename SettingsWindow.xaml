@@ -69,6 +69,15 @@ Minimum="1000"
            <CheckBox x:Name="ShowThumbnailsCheckBox" 
          Content="Show thumbnail previews in list"
           Margin="0,0,0,5"/>
+  <CheckBox x:Name="LoadPreviewsCheckBox" 
+         Content="Load preview images during scan"
+   Margin="0,0,0,5"/>
+          <TextBlock Text="When enabled: Downloads small previews during scan so you can see images before downloading"
+     FontSize="10"
+   FontStyle="Italic"
+      Foreground="Gray"
+    Margin="0,5,0,0"
+ TextWrapping="Wrap"/>
      </StackPanel>
           </GroupBox>
 
