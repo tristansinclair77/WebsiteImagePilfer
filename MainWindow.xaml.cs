@@ -787,6 +787,9 @@ catch
     item.Status = "✓ Done"; // Successfully downloaded (full-res if available)
  }
 
+    // Clear error message on successful download
+  item.ErrorMessage = "";
+
     var totalElapsed = (DateTime.Now - startTime).TotalMilliseconds;
       // LOG: Total time
      System.Diagnostics.Debug.WriteLine($"Downloaded {fileName} in {totalElapsed}ms (download: {downloadElapsed}ms)");
