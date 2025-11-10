@@ -30,19 +30,24 @@ namespace WebsiteImagePilfer
     {
      private readonly HttpClient _httpClient;
  private ObservableCollection<ImageDownloadItem> _imageItems;
+        private ObservableCollection<ImageDownloadItem> _currentPageItems; // Items for current page
  private string _downloadFolder;
    private CancellationTokenSource? _cancellationTokenSource;
  private DownloadSettings _settings;
-        private List<string> _scannedImageUrls; // Store scanned URLs
+  private List<string> _scannedImageUrls; // Store scanned URLs
+        public int _currentPage = 1; // Public for converter access
+        public int _itemsPerPage = 50; // Public for converter access
+      private int _totalPages = 1;
 
    public MainWindow()
      {
-       InitializeComponent();
-       _httpClient = new HttpClient();
+ InitializeComponent();
+_httpClient = new HttpClient();
     _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
    _httpClient.Timeout = TimeSpan.FromSeconds(30);
       _imageItems = new ObservableCollection<ImageDownloadItem>();
- ImageList.ItemsSource = _imageItems;
+      _currentPageItems = new ObservableCollection<ImageDownloadItem>();
+ ImageList.ItemsSource = _currentPageItems; // Bind to current page items
     _scannedImageUrls = new List<string>();
           
      // Load settings
@@ -170,7 +175,12 @@ fileName = fParam;
      }
 
         string scanType = useFastScan ? "Fast" : "Thorough";
-      string limitInfo = _settings.LimitScanCount ? $" (limited to {_settings.MaxImagesToScan})" : "";
+ string limitInfo = _settings.LimitScanCount ? $" (limited to {_settings.MaxImagesToScan})" : "";
+ 
+            // Reset to page 1 and update pagination
+  _currentPage = 1;
+   UpdatePagination();
+  
      StatusText.Text = $"Found {_imageItems.Count} images{limitInfo} ({scanType} scan). Click 'Download' to save them.";
     DownloadButton.IsEnabled = true;
  
@@ -305,35 +315,38 @@ _cancellationTokenSource?.Cancel();
   {
             // Create download folder if it doesn't exist
             if (!Directory.Exists(_downloadFolder))
-          {
+     {
 Directory.CreateDirectory(_downloadFolder);
     }
 
-            int downloadedCount = 0;
+int downloadedCount = 0;
        int skippedCount = 0;
  int duplicateCount = 0;
-         int totalToDownload = _imageItems.Count(i => i.Status == "Ready");
+  int totalToDownload = _imageItems.Count(i => i.Status == "Ready");
 
             foreach (var item in _imageItems.Where(i => i.Status == "Ready").ToList())
     {
        cancellationToken.ThrowIfCancellationRequested();
 
-                await DownloadSingleItemAsync(item, cancellationToken);
+        await DownloadSingleItemAsync(item, cancellationToken);
 
-             if (item.Status == "✓ Done") downloadedCount++;
+   if (item.Status == "✓ Done") downloadedCount++;
          else if (item.Status.Contains("Duplicate")) { skippedCount++; duplicateCount++; }
         else if (item.Status.Contains("Skipped")) skippedCount++;
 
          // Update progress
               int processedCount = downloadedCount + skippedCount;
-       DownloadProgress.Value = (processedCount * 100.0) / totalToDownload;
-      StatusText.Text = $"Downloaded: {downloadedCount} | Skipped: {skippedCount} (Duplicates: {duplicateCount}) | Remaining: {totalToDownload - processedCount}";
+     DownloadProgress.Value = (processedCount * 100.0) / totalToDownload;
+    StatusText.Text = $"Downloaded: {downloadedCount} | Skipped: {skippedCount} (Duplicates: {duplicateCount}) | Remaining: {totalToDownload - processedCount}";
 
                 // Small delay to allow UI to update
   await Task.Delay(10, cancellationToken);
           }
 
-          return downloadedCount;
+     // Refresh current page to show updated statuses
+        LoadCurrentPage();
+      
+return downloadedCount;
  }
 
         private async Task DownloadSingleItemAsync(ImageDownloadItem item, CancellationToken cancellationToken)
@@ -556,8 +569,8 @@ await Task.Run(() =>
 {
     retryCount++;
     if (retryCount >= 3) throw;
-       StatusText.Dispatcher.Invoke(() => StatusText.Text = $"Page load timeout, retrying ({retryCount}/3)...");
-     System.Threading.Thread.Sleep(2000);
+  StatusText.Dispatcher.Invoke(() => StatusText.Text = $"Page load timeout, retrying ({retryCount}/3)...");
+System.Threading.Thread.Sleep(2000);
      }
 }
 
@@ -995,19 +1008,70 @@ Directory.Delete(newFolderPath);
         {
    // Remove invalid path characters
  var invalidChars = IOPath.GetInvalidFileNameChars();
-    var sanitized = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
+ var sanitized = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
      
-            // Ensure filename is not too long (max 200 characters)
+         // Ensure filename is not too long (max 200 characters)
  if (sanitized.Length > 200)
      {
-             var extension = IOPath.GetExtension(sanitized);
+  var extension = IOPath.GetExtension(sanitized);
       sanitized = sanitized.Substring(0, 200 - extension.Length) + extension;
     }
  
      return sanitized;
       }
 
-        private async Task<string?> TryFindFullResolutionUrlAsync(string previewUrl, CancellationToken cancellationToken)
+        private void UpdatePagination()
+  {
+      _totalPages = (int)Math.Ceiling((double)_imageItems.Count / _itemsPerPage);
+    if (_totalPages == 0) _totalPages = 1;
+            
+   // Ensure current page is valid
+   if (_currentPage > _totalPages) _currentPage = _totalPages;
+  if (_currentPage < 1) _currentPage = 1;
+
+   // Update page info text
+    PageInfoText.Text = $"Page {_currentPage} of {_totalPages} ({_imageItems.Count} images)";
+   
+   // Update button states
+    PrevPageButton.IsEnabled = _currentPage > 1;
+    NextPageButton.IsEnabled = _currentPage < _totalPages;
+
+         // Load current page items
+  LoadCurrentPage();
+ }
+
+   private void LoadCurrentPage()
+        {
+       _currentPageItems.Clear();
+            
+      int startIndex = (_currentPage - 1) * _itemsPerPage;
+   int endIndex = Math.Min(startIndex + _itemsPerPage, _imageItems.Count);
+
+   for (int i = startIndex; i < endIndex; i++)
+  {
+    _currentPageItems.Add(_imageItems[i]);
+   }
+        }
+
+ private void PrevPageButton_Click(object sender, RoutedEventArgs e)
+      {
+    if (_currentPage > 1)
+   {
+    _currentPage--;
+    UpdatePagination();
+         }
+ }
+
+      private void NextPageButton_Click(object sender, RoutedEventArgs e)
+        {
+ if (_currentPage < _totalPages)
+   {
+     _currentPage++;
+       UpdatePagination();
+    }
+ }
+
+  private async Task<string?> TryFindFullResolutionUrlAsync(string previewUrl, CancellationToken cancellationToken)
         {
   try
    {
@@ -1168,17 +1232,24 @@ public string Url
     // Converter to get the index of a ListView item
     public class ListViewIndexConverter : IValueConverter
     {
-        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+    public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
         {
             if (value is ListViewItem listViewItem)
  {
    var listView = FindParent<ListView>(listViewItem);
   if (listView != null)
     {
-          int index = listView.ItemContainerGenerator.IndexFromContainer(listViewItem);
-    return (index + 1).ToString(); // 1-based index
-       }
+  var mainWindow = FindParent<MainWindow>(listView);
+   int localIndex = listView.ItemContainerGenerator.IndexFromContainer(listViewItem);
+ 
+           if (mainWindow != null && localIndex >= 0)
+      {
+         // Calculate global index based on current page
+        int globalIndex = ((mainWindow._currentPage - 1) * mainWindow._itemsPerPage) + localIndex + 1;
+      return globalIndex.ToString();
+         }
     }
+  }
   return "?";
   }
 
@@ -1192,7 +1263,7 @@ public string Url
    DependencyObject parentObject = VisualTreeHelper.GetParent(child);
   if (parentObject == null) return null;
 
-          if (parentObject is T parent)
+       if (parentObject is T parent)
   return parent;
        else
    return FindParent<T>(parentObject);

@@ -15,6 +15,7 @@ xmlns:local="clr-namespace:WebsiteImagePilfer"
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         <RowDefinition Height="*"/>
+     <RowDefinition Height="Auto"/>
       <RowDefinition Height="Auto"/>
   </Grid.RowDefinitions>
      
@@ -134,13 +135,13 @@ IsReadOnly="True"/>
    <ListView.View>
      <GridView>
  <GridViewColumn Header="#" Width="40">
-         <GridViewColumn.CellTemplate>
-          <DataTemplate>
+    <GridViewColumn.CellTemplate>
+       <DataTemplate>
         <TextBlock Text="{Binding RelativeSource={RelativeSource AncestorType=ListViewItem}, 
        Converter={StaticResource IndexConverter}}"
-              HorizontalAlignment="Center"/>
+          HorizontalAlignment="Center"/>
            </DataTemplate>
-                </GridViewColumn.CellTemplate>
+    </GridViewColumn.CellTemplate>
       </GridViewColumn>
        <GridViewColumn Header="Preview" Width="80">
         <GridViewColumn.CellTemplate>
@@ -148,9 +149,9 @@ IsReadOnly="True"/>
  <Image Source="{Binding ThumbnailPath}" 
   Width="60" 
        Height="60" 
-     Stretch="Uniform"
+   Stretch="Uniform"
   Margin="2"/>
-     </DataTemplate>
+  </DataTemplate>
  </GridViewColumn.CellTemplate>
      </GridViewColumn>
         <GridViewColumn Header="Status" Width="80">
@@ -174,9 +175,9 @@ IsReadOnly="True"/>
    </DataTemplate>
   </GridViewColumn.CellTemplate>
       </GridViewColumn>
-      <GridViewColumn Header="Error" Width="280">
-            <GridViewColumn.CellTemplate>
-            <DataTemplate>
+ <GridViewColumn Header="Error" Width="280">
+   <GridViewColumn.CellTemplate>
+        <DataTemplate>
         <TextBlock Text="{Binding ErrorMessage}" 
    Foreground="Red"
 TextTrimming="CharacterEllipsis" 
@@ -186,13 +187,51 @@ TextTrimming="CharacterEllipsis"
      </GridViewColumn>
       </GridView>
      </ListView.View>
-        </ListView>
+      </ListView>
+
+     <!-- Pagination Controls -->
+    <Grid Grid.Row="4" Height="30" Margin="0,0,0,5">
+    <Grid.ColumnDefinitions>
+     <ColumnDefinition Width="*"/>
+   <ColumnDefinition Width="Auto"/>
+      <ColumnDefinition Width="Auto"/>
+  <ColumnDefinition Width="Auto"/>
+    <ColumnDefinition Width="*"/>
+ </Grid.ColumnDefinitions>
+            
+            <Button x:Name="PrevPageButton" 
+           Grid.Column="1"
+         Content="◄ Previous" 
+           Width="80" 
+           Height="25"
+      Margin="0,0,10,0"
+      Click="PrevPageButton_Click"
+         IsEnabled="False"/>
+  
+            <TextBlock x:Name="PageInfoText"
+            Grid.Column="2"
+       Text="Page 1 of 1"
+        VerticalAlignment="Center"
+              HorizontalAlignment="Center"
+         MinWidth="100"
+         TextAlignment="Center"
+          Margin="10,0,10,0"/>
+            
+ <Button x:Name="NextPageButton" 
+           Grid.Column="3"
+     Content="Next ►" 
+  Width="80" 
+      Height="25"
+           Margin="10,0,0,0"
+      Click="NextPageButton_Click"
+      IsEnabled="False"/>
+        </Grid>
         
      <!-- Status Bar -->
-    <StatusBar Grid.Row="4" Height="25">
+    <StatusBar Grid.Row="5" Height="25">
     <StatusBarItem>
   <TextBlock x:Name="StatusText" Text="Ready"/>
    </StatusBarItem>
-        </StatusBar>
+    </StatusBar>
   </Grid>
 </Window>
