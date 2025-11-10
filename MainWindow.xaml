@@ -27,6 +27,7 @@ xmlns:local="clr-namespace:WebsiteImagePilfer"
         <ColumnDefinition Width="Auto"/>
   <ColumnDefinition Width="Auto"/>
     <ColumnDefinition Width="Auto"/>
+    <ColumnDefinition Width="Auto"/>
       </Grid.ColumnDefinitions>
     
   <TextBox x:Name="UrlTextBox" 
@@ -59,14 +60,25 @@ Grid.Column="3"
       Height="30"
        Margin="0,0,5,0"
          IsEnabled="False"
-Click="DownloadButton_Click"/>
+Click="DownloadButton_Click"
+        ToolTip="Download all ready images"/>
+  
+  <Button x:Name="DownloadSelectedButton" 
+    Grid.Column="4"
+         Content="Download Selected" 
+   Width="130" 
+   Height="30"
+     Margin="0,0,5,0"
+    IsEnabled="False"
+    Click="DownloadSelectedButton_Click"
+  ToolTip="Download only selected images"/>
   
     <Button x:Name="CancelButton" 
-     Grid.Column="4"
+     Grid.Column="5"
     Content="Cancel" 
          Width="80" 
        Height="30"
-        IsEnabled="False"
+  IsEnabled="False"
 Click="CancelButton_Click"/>
      </Grid>
    
@@ -131,6 +143,8 @@ IsReadOnly="True"/>
         <ListView x:Name="ImageList" 
      Grid.Row="3"
      Margin="0,0,0,10"
+    SelectionMode="Extended"
+    SelectionChanged="ImageList_SelectionChanged"
   MouseDoubleClick="ImageList_MouseDoubleClick">
    <ListView.View>
      <GridView>
@@ -181,13 +195,13 @@ IsReadOnly="True"/>
         <TextBlock Text="{Binding ErrorMessage}" 
    Foreground="Red"
 TextTrimming="CharacterEllipsis" 
-    ToolTip="{Binding ErrorMessage}"/>
+ ToolTip="{Binding ErrorMessage}"/>
     </DataTemplate>
     </GridViewColumn.CellTemplate>
      </GridViewColumn>
       </GridView>
-     </ListView.View>
-      </ListView>
+   </ListView.View>
+     </ListView>
 
      <!-- Pagination Controls -->
     <Grid Grid.Row="4" Height="30" Margin="0,0,0,5">

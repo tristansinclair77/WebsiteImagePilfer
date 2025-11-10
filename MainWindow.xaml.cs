@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
@@ -281,7 +282,127 @@ _cancellationTokenSource?.Cancel();
  }
         }
 
-        private async Task DownloadSingleImageAsync(ImageDownloadItem item)
+        private void ImageList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+      {
+  // Enable Download Selected button only if there are selected items with "Ready" status
+ var selectedReadyItems = ImageList.SelectedItems.Cast<ImageDownloadItem>()
+       .Where(item => item.Status == "Ready")
+   .ToList();
+      
+   DownloadSelectedButton.IsEnabled = selectedReadyItems.Count > 0;
+ }
+
+  private async void DownloadSelectedButton_Click(object sender, RoutedEventArgs e)
+  {
+      var selectedItems = ImageList.SelectedItems.Cast<ImageDownloadItem>().ToList();
+  
+  if (selectedItems.Count == 0)
+      {
+      MessageBox.Show("No images selected. Please select images to download.", "No Selection", 
+   MessageBoxButton.OK, MessageBoxImage.Warning);
+   return;
+ }
+
+   var readyItems = selectedItems.Where(item => item.Status == "Ready").ToList();
+         
+      if (readyItems.Count == 0)
+   {
+       MessageBox.Show("No ready images selected. Selected images may already be downloaded.", "No Ready Images", 
+      MessageBoxButton.OK, MessageBoxImage.Information);
+        return;
+   }
+
+   // Setup cancellation token
+     _cancellationTokenSource = new CancellationTokenSource();
+
+      // Update UI state
+ ScanOnlyButton.IsEnabled = false;
+ DownloadButton.IsEnabled = false;
+ DownloadSelectedButton.IsEnabled = false;
+  CancelButton.IsEnabled = true;
+  DownloadProgress.Value = 0;
+
+      try
+  {
+  StatusText.Text = $"Starting download of {readyItems.Count} selected images...";
+    
+     // Download selected images
+  int downloadedCount = await DownloadSelectedImagesAsync(readyItems, _cancellationTokenSource.Token);
+    
+       if (_cancellationTokenSource.Token.IsCancellationRequested)
+      {
+       StatusText.Text = $"Cancelled. Downloaded {downloadedCount} of {readyItems.Count} selected images.";
+MessageBox.Show($"Operation cancelled. Downloaded {downloadedCount} of {readyItems.Count} selected images.", 
+         "Cancelled", MessageBoxButton.OK, MessageBoxImage.Information);
+   }
+       else
+    {
+     StatusText.Text = $"Download complete! {downloadedCount} of {readyItems.Count} selected images saved to {_downloadFolder}";
+   MessageBox.Show($"Successfully downloaded {downloadedCount} selected images!", "Success", 
+  MessageBoxButton.OK, MessageBoxImage.Information);
+   }
+     }
+ catch (OperationCanceledException)
+  {
+ StatusText.Text = "Download cancelled by user.";
+    }
+  catch (Exception ex)
+    {
+      MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+   StatusText.Text = "Error occurred during download.";
+      }
+  finally
+      {
+     ScanOnlyButton.IsEnabled = true;
+ DownloadButton.IsEnabled = true;
+    CancelButton.IsEnabled = false;
+ _cancellationTokenSource?.Dispose();
+       _cancellationTokenSource = null;
+        
+     // Re-evaluate Download Selected button state
+    ImageList_SelectionChanged(ImageList, new SelectionChangedEventArgs(Selector.SelectionChangedEvent, new List<object>(), new List<object>()));
+ }
+   }
+
+        private async Task<int> DownloadSelectedImagesAsync(List<ImageDownloadItem> selectedItems, CancellationToken cancellationToken)
+  {
+    // Create download folder if it doesn't exist
+  if (!Directory.Exists(_downloadFolder))
+   {
+   Directory.CreateDirectory(_downloadFolder);
+  }
+
+     int downloadedCount = 0;
+ int skippedCount = 0;
+       int duplicateCount = 0;
+ int totalToDownload = selectedItems.Count;
+
+        foreach (var item in selectedItems)
+        {
+       cancellationToken.ThrowIfCancellationRequested();
+
+   await DownloadSingleItemAsync(item, cancellationToken);
+
+   if (item.Status == "✓ Done") downloadedCount++;
+   else if (item.Status.Contains("Duplicate")) { skippedCount++; duplicateCount++; }
+      else if (item.Status.Contains("Skipped")) skippedCount++;
+
+     // Update progress
+    int processedCount = downloadedCount + skippedCount;
+  DownloadProgress.Value = (processedCount * 100.0) / totalToDownload;
+   StatusText.Text = $"Downloaded: {downloadedCount} | Skipped: {skippedCount} (Duplicates: {duplicateCount}) | Remaining: {totalToDownload - processedCount}";
+
+     // Small delay to allow UI to update
+  await Task.Delay(10, cancellationToken);
+        }
+
+     // Refresh current page to show updated statuses
+        LoadCurrentPage();
+
+      return downloadedCount;
+        }
+
+    private async Task DownloadSingleImageAsync(ImageDownloadItem item)
         {
   if (item.Status == "✓ Done" || item.Status == "⊘ Duplicate")
     {
