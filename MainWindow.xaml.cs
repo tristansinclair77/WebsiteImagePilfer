@@ -277,8 +277,68 @@ _cancellationTokenSource?.Cancel();
         {
  if (ImageList.SelectedItem is ImageDownloadItem item)
         {
-           // Download single image on double-click
-    _ = DownloadSingleImageAsync(item);
+ // If image is already downloaded, open it
+       if (item.Status == "✓ Done" || item.Status == "✓ Backup")
+       {
+  var filePath = IOPath.Combine(_downloadFolder, item.FileName);
+              if (File.Exists(filePath))
+     {
+        try
+ {
+ // Open the file with default application
+        var processStartInfo = new System.Diagnostics.ProcessStartInfo
+          {
+             FileName = filePath,
+         UseShellExecute = true
+               };
+               System.Diagnostics.Process.Start(processStartInfo);
+StatusText.Text = $"Opened: {item.FileName}";
+     }
+         catch (Exception ex)
+    {
+       MessageBox.Show($"Failed to open file: {ex.Message}", "Error Opening File",
+   MessageBoxButton.OK, MessageBoxImage.Error);
+               }
+      }
+       else
+   {
+      MessageBox.Show($"File not found: {item.FileName}\n\nThe file may have been moved or deleted.",
+        "File Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
+     }
+          }
+  else if (item.Status == "⊘ Duplicate")
+            {
+      // Duplicate - file already exists, open it
+      var filePath = IOPath.Combine(_downloadFolder, item.FileName);
+    if (File.Exists(filePath))
+     {
+  try
+                 {
+        var processStartInfo = new System.Diagnostics.ProcessStartInfo
+      {
+          FileName = filePath,
+         UseShellExecute = true
+       };
+      System.Diagnostics.Process.Start(processStartInfo);
+    StatusText.Text = $"Opened: {item.FileName}";
+      }
+          catch (Exception ex)
+        {
+         MessageBox.Show($"Failed to open file: {ex.Message}", "Error Opening File",
+             MessageBoxButton.OK, MessageBoxImage.Error);
+      }
+ }
+         else
+          {
+          MessageBox.Show($"File not found: {item.FileName}\n\nThe file may have been moved or deleted.",
+      "File Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
+     }
+            }
+  else
+   {
+        // Not downloaded yet - try to download
+            _ = DownloadSingleImageAsync(item);
+            }
  }
         }
 
