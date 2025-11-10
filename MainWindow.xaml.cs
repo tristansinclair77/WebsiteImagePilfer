@@ -839,7 +839,20 @@ await Task.Run(() =>
       driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(60);
     driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(10);
 
-        StatusText.Dispatcher.Invoke(() => StatusText.Text = "Loading page with JavaScript...");
+    // Bring main window to front after Selenium window opens
+    StatusText.Dispatcher.Invoke(() =>
+    {
+        var mainWindow = Application.Current.MainWindow;
+        if (mainWindow != null)
+        {
+            mainWindow.Activate();
+    mainWindow.Topmost = true;
+   mainWindow.Topmost = false;
+            mainWindow.Focus();
+        }
+    });
+
+ StatusText.Dispatcher.Invoke(() => StatusText.Text = "Loading page with JavaScript...");
 
  // Navigate to URL with retry logic
  int retryCount = 0;
