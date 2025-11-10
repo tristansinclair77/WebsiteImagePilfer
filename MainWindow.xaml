@@ -21,32 +21,42 @@ xmlns:local="clr-namespace:WebsiteImagePilfer"
       <ColumnDefinition Width="*"/>
       <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="Auto"/>
+    <ColumnDefinition Width="Auto"/>
       </Grid.ColumnDefinitions>
       
   <TextBox x:Name="UrlTextBox" 
         Grid.Column="0"
     Height="30" 
-       VerticalContentAlignment="Center"
+  VerticalContentAlignment="Center"
     Padding="5"
    Margin="0,0,10,0"
 Text="https://example.com"/>
       
-   <Button x:Name="ScanButton" 
+   <Button x:Name="ScanOnlyButton" 
      Grid.Column="1"
-    Content="Scan &amp; Download" 
-     Width="150" 
+    Content="Scan" 
+     Width="80" 
         Height="30"
        Margin="0,0,5,0"
-Click="ScanButton_Click"/>
+Click="ScanOnlyButton_Click"/>
+  
+   <Button x:Name="DownloadButton" 
+Grid.Column="2"
+  Content="Download" 
+     Width="100" 
+        Height="30"
+       Margin="0,0,5,0"
+            IsEnabled="False"
+Click="DownloadButton_Click"/>
        
-            <Button x:Name="CancelButton" 
-     Grid.Column="2"
+    <Button x:Name="CancelButton" 
+     Grid.Column="3"
     Content="Cancel" 
          Width="80" 
        Height="30"
         IsEnabled="False"
 Click="CancelButton_Click"/>
-        </Grid>
+     </Grid>
    
         <!-- Progress Bar -->
     <ProgressBar x:Name="DownloadProgress" 
@@ -98,7 +108,8 @@ IsReadOnly="True"/>
    <!-- Image List -->
         <ListView x:Name="ImageList" 
      Grid.Row="3"
-     Margin="0,0,0,10">
+     Margin="0,0,0,10"
+  MouseDoubleClick="ImageList_MouseDoubleClick">
    <ListView.View>
      <GridView>
          <GridViewColumn Header="Preview" Width="80">
