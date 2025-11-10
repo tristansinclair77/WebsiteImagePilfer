@@ -274,8 +274,8 @@ _cancellationTokenSource?.Cancel();
    }
      catch (Exception ex)
    {
-          item.Status = "✗ Failed";
-          item.FileName = ex.Message;
+  item.Status = "✗ Failed";
+          item.ErrorMessage = ex.Message;
           MessageBox.Show($"Failed to download: {ex.Message}", "Download Error", 
   MessageBoxButton.OK, MessageBoxImage.Error);
      }
@@ -482,14 +482,14 @@ catch
      catch (HttpRequestException ex)
       {
        item.Status = "✗ Failed";
-   item.FileName = $"{item.FileName} - Network error: {ex.Message}";
+   item.ErrorMessage = $"Network error: {ex.Message}";
       System.Diagnostics.Debug.WriteLine($"HTTP error for {item.FileName}: {ex.Message}");
-    }
+  }
     catch (Exception ex)
   {
 item.Status = "✗ Failed";
-item.FileName = $"{item.FileName} - {ex.Message}";
-     System.Diagnostics.Debug.WriteLine($"Error for {item.FileName}: {ex.Message}");
+item.ErrorMessage = ex.Message;
+System.Diagnostics.Debug.WriteLine($"Error for {item.FileName}: {ex.Message}");
   }
       }
 
@@ -1093,6 +1093,7 @@ return previewUrl; // Return original URL (it's likely already full-res from sca
         private string _status = "";
         private string _fileName = "";
         private string? _thumbnailPath;
+        private string _errorMessage = "";
 
 public string Url
         {
@@ -1102,27 +1103,33 @@ public string Url
 
   public string Status
         {
-            get => _status;
-            set { _status = value; OnPropertyChanged(nameof(Status)); }
-        }
+        get => _status;
+          set { _status = value; OnPropertyChanged(nameof(Status)); }
+    }
 
-        public string FileName
+      public string FileName
         {
-            get => _fileName;
-       set { _fileName = value; OnPropertyChanged(nameof(FileName)); }
+          get => _fileName;
+  set { _fileName = value; OnPropertyChanged(nameof(FileName)); }
     }
 
  public string? ThumbnailPath
  {
             get => _thumbnailPath;
-            set { _thumbnailPath = value; OnPropertyChanged(nameof(ThumbnailPath)); }
+ set { _thumbnailPath = value; OnPropertyChanged(nameof(ThumbnailPath)); }
   }
+
+        public string ErrorMessage
+        {
+            get => _errorMessage;
+   set { _errorMessage = value; OnPropertyChanged(nameof(ErrorMessage)); }
+      }
 
       public event PropertyChangedEventHandler? PropertyChanged;
 
-        protected virtual void OnPropertyChanged(string propertyName)
+   protected virtual void OnPropertyChanged(string propertyName)
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 

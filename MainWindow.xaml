@@ -148,20 +148,30 @@ IsReadOnly="True"/>
   </DataTemplate>
           </GridViewColumn.CellTemplate>
        </GridViewColumn>
-     <GridViewColumn Header="Image URL" Width="480">
-           <GridViewColumn.CellTemplate>
+     <GridViewColumn Header="Image URL" Width="320">
+  <GridViewColumn.CellTemplate>
    <DataTemplate>
    <TextBlock Text="{Binding Url}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Url}"/>
  </DataTemplate>
  </GridViewColumn.CellTemplate>
            </GridViewColumn>
-      <GridViewColumn Header="Filename" Width="180">
+      <GridViewColumn Header="Filename" Width="150">
      <GridViewColumn.CellTemplate>
    <DataTemplate>
       <TextBlock Text="{Binding FileName}"/>
-           </DataTemplate>
+   </DataTemplate>
   </GridViewColumn.CellTemplate>
       </GridViewColumn>
+      <GridViewColumn Header="Error" Width="280">
+            <GridViewColumn.CellTemplate>
+            <DataTemplate>
+          <TextBlock Text="{Binding ErrorMessage}" 
+   Foreground="Red"
+TextTrimming="CharacterEllipsis" 
+    ToolTip="{Binding ErrorMessage}"/>
+      </DataTemplate>
+    </GridViewColumn.CellTemplate>
+     </GridViewColumn>
           </GridView>
         </ListView.View>
         </ListView>
