@@ -1327,6 +1327,37 @@ return imageUrls.ToList();
      }
         }
 
+    private void UpFolderButton_Click(object sender, RoutedEventArgs e)
+        {
+      try
+            {
+ // Get the parent directory
+      var parentDir = IOPath.GetDirectoryName(_downloadFolder);
+
+    if (!string.IsNullOrEmpty(parentDir) && Directory.Exists(parentDir))
+  {
+                  _downloadFolder = parentDir;
+        FolderTextBox.Text = _downloadFolder;
+
+       // Save to settings
+       Properties.Settings.Default.DownloadFolder = _downloadFolder;
+      Properties.Settings.Default.Save();
+
+            StatusText.Text = $"Navigated up to: {_downloadFolder}";
+         }
+else
+         {
+       MessageBox.Show("Cannot navigate up - already at root directory.", "Cannot Go Up",
+             MessageBoxButton.OK, MessageBoxImage.Information);
+}
+            }
+     catch (Exception ex)
+    {
+        MessageBox.Show($"Failed to navigate up: {ex.Message}", "Error Navigating",
+        MessageBoxButton.OK, MessageBoxImage.Error);
+      }
+    }
+
    private void NewFolderButton_Click(object sender, RoutedEventArgs e)
    {
             try

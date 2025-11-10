@@ -100,9 +100,10 @@ Click="CancelButton_Click"/>
     <ColumnDefinition Width="Auto"/>
 <ColumnDefinition Width="Auto"/>
    <ColumnDefinition Width="Auto"/>
+   <ColumnDefinition Width="Auto"/>
    </Grid.ColumnDefinitions>
      
-       <TextBlock Grid.Column="0" 
+    <TextBlock Grid.Column="0" 
    Text="Save to:" 
      VerticalAlignment="Center"
  Margin="0,0,10,0"/>
@@ -123,27 +124,36 @@ IsReadOnly="True"/>
          Margin="0,0,5,0"
   Click="BrowseButton_Click"/>
 
-    <Button x:Name="NewFolderButton" 
+    <Button x:Name="UpFolderButton" 
          Grid.Column="3"
+    Content="Up ▲" 
+       Width="60"
+   Height="25"
+     Margin="0,0,5,0"
+    Click="UpFolderButton_Click"
+          ToolTip="Go up one folder level"/>
+
+    <Button x:Name="NewFolderButton" 
+         Grid.Column="4"
     Content="New Folder" 
        Width="80"
    Height="25"
      Margin="0,0,5,0"
-    Click="NewFolderButton_Click"
+Click="NewFolderButton_Click"
           ToolTip="Create a new folder in the current location"/>
 
-    <Button x:Name="OpenFolderButton" 
-         Grid.Column="4"
+<Button x:Name="OpenFolderButton" 
+ Grid.Column="5"
     Content="Open Folder" 
          Width="80"
    Height="25"
      Margin="0,0,5,0"
   Click="OpenFolderButton_Click"
-              ToolTip="Open the download folder in File Explorer"/>
+         ToolTip="Open the download folder in File Explorer"/>
     
          <Button x:Name="SettingsButton" 
-  Grid.Column="5"
-    Content="Settings..." 
+  Grid.Column="6"
+ Content="Settings..." 
  Width="80"
     Height="25"
   Click="SettingsButton_Click"/>
