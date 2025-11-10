@@ -14,9 +14,10 @@ xmlns:local="clr-namespace:WebsiteImagePilfer"
       <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
         <RowDefinition Height="*"/>
-     <RowDefinition Height="Auto"/>
-      <RowDefinition Height="Auto"/>
+  <RowDefinition Height="Auto"/>
+   <RowDefinition Height="Auto"/>
   </Grid.RowDefinitions>
   
       <!-- URL Input Row -->
@@ -159,20 +160,89 @@ Click="NewFolderButton_Click"
   Click="SettingsButton_Click"/>
 </Grid>
       
+    <!-- Status Filter Section -->
+    <Expander Grid.Row="3" Header="Status Filters" IsExpanded="True" Margin="0,0,0,10">
+          <Border BorderBrush="#CCCCCC" BorderThickness="1" Padding="10" Background="#F9F9F9">
+  <WrapPanel Orientation="Horizontal">
+      <CheckBox x:Name="FilterReadyCheckBox" 
+    Content="Ready" 
+    IsChecked="True"
+        Margin="0,0,15,5"
+           Checked="StatusFilter_Changed"
+             Unchecked="StatusFilter_Changed"/>
+    <CheckBox x:Name="FilterDoneCheckBox" 
+        Content="✓ Done" 
+     IsChecked="True"
+   Margin="0,0,15,5"
+           Checked="StatusFilter_Changed"
+        Unchecked="StatusFilter_Changed"/>
+          <CheckBox x:Name="FilterBackupCheckBox" 
+         Content="✓ Backup" 
+      IsChecked="True"
+          Margin="0,0,15,5"
+       Checked="StatusFilter_Changed"
+         Unchecked="StatusFilter_Changed"/>
+           <CheckBox x:Name="FilterDuplicateCheckBox" 
+                  Content="⊘ Duplicate" 
+           IsChecked="True"
+            Margin="0,0,15,5"
+          Checked="StatusFilter_Changed"
+          Unchecked="StatusFilter_Changed"/>
+         <CheckBox x:Name="FilterFailedCheckBox" 
+            Content="✗ Failed" 
+      IsChecked="True"
+            Margin="0,0,15,5"
+        Checked="StatusFilter_Changed"
+         Unchecked="StatusFilter_Changed"/>
+         <CheckBox x:Name="FilterSkippedCheckBox" 
+          Content="⊘ Skipped" 
+                 IsChecked="True"
+             Margin="0,0,15,5"
+         Checked="StatusFilter_Changed"
+         Unchecked="StatusFilter_Changed"/>
+   <CheckBox x:Name="FilterCancelledCheckBox" 
+    Content="⊘ Cancelled" 
+        IsChecked="True"
+         Margin="0,0,15,5"
+      Checked="StatusFilter_Changed"
+          Unchecked="StatusFilter_Changed"/>
+      <CheckBox x:Name="FilterDownloadingCheckBox" 
+ Content="Downloading..." 
+  IsChecked="True"
+           Margin="0,0,15,5"
+ Checked="StatusFilter_Changed"
+           Unchecked="StatusFilter_Changed"/>
+                  <Separator Width="10" Opacity="0"/>
+    <Button x:Name="SelectAllStatusButton" 
+          Content="Select All" 
+     Width="80" 
+          Height="22"
+   Margin="5,0,5,0"
+          Click="SelectAllStatus_Click"/>
+      <Button x:Name="ClearAllStatusButton" 
+     Content="Clear All" 
+    Width="80" 
+    Height="22"
+         Margin="0,0,0,0"
+      Click="ClearAllStatus_Click"/>
+    </WrapPanel>
+   </Border>
+      </Expander>
+   
    <!-- Image List -->
         <ListView x:Name="ImageList" 
-   Grid.Row="3"
+   Grid.Row="4"
      Margin="0,0,0,10"
     SelectionMode="Extended"
     SelectionChanged="ImageList_SelectionChanged"
   MouseDoubleClick="ImageList_MouseDoubleClick">
-     <ListView.ContextMenu>
+  <ListView.ContextMenu>
         <ContextMenu>
         <MenuItem Header="Download (Force)" Click="ContextMenu_Download_Click" />
  <MenuItem Header="Reload Preview" Click="ContextMenu_ReloadPreview_Click" />
        <Separator />
         <MenuItem Header="Cancel Download" Click="ContextMenu_Cancel_Click" />
-            </ContextMenu>
+     </ContextMenu>
           </ListView.ContextMenu>
    <ListView.View>
      <GridView>
@@ -195,25 +265,25 @@ Click="NewFolderButton_Click"
   HorizontalAlignment="Center"
   VerticalAlignment="Center"
         RenderOptions.BitmapScalingMode="Fant"
-            UseLayoutRounding="True"
+   UseLayoutRounding="True"
 SnapsToDevicePixels="True"/>
   </DataTemplate>
  </GridViewColumn.CellTemplate>
-     </GridViewColumn>
+  </GridViewColumn>
         <GridViewColumn Header="Status" Width="80">
      <GridViewColumn.CellTemplate>
     <DataTemplate>
     <TextBlock Text="{Binding Status}"/>
   </DataTemplate>
-        </GridViewColumn.CellTemplate>
-       </GridViewColumn>
+  </GridViewColumn.CellTemplate>
+     </GridViewColumn>
      <GridViewColumn Header="Image URL" Width="320">
   <GridViewColumn.CellTemplate>
    <DataTemplate>
    <TextBlock Text="{Binding Url}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Url}"/>
  </DataTemplate>
  </GridViewColumn.CellTemplate>
-           </GridViewColumn>
+    </GridViewColumn>
     <GridViewColumn Header="Filename" Width="150">
      <GridViewColumn.CellTemplate>
    <DataTemplate>
@@ -230,13 +300,13 @@ TextTrimming="CharacterEllipsis"
  ToolTip="{Binding ErrorMessage}"/>
     </DataTemplate>
     </GridViewColumn.CellTemplate>
-     </GridViewColumn>
+ </GridViewColumn>
       </GridView>
    </ListView.View>
      </ListView>
 
      <!-- Pagination Controls -->
-    <Grid Grid.Row="4" Height="30" Margin="0,0,0,5">
+    <Grid Grid.Row="5" Height="30" Margin="0,0,0,5">
     <Grid.ColumnDefinitions>
      <ColumnDefinition Width="*"/>
    <ColumnDefinition Width="Auto"/>
@@ -246,35 +316,35 @@ TextTrimming="CharacterEllipsis"
  </Grid.ColumnDefinitions>
             
             <Button x:Name="PrevPageButton" 
-           Grid.Column="1"
+    Grid.Column="1"
          Content="◄ Previous" 
            Width="80" 
-           Height="25"
+  Height="25"
       Margin="0,0,10,0"
-      Click="PrevPageButton_Click"
-         IsEnabled="False"/>
+   Click="PrevPageButton_Click"
+      IsEnabled="False"/>
   
-            <TextBlock x:Name="PageInfoText"
+        <TextBlock x:Name="PageInfoText"
             Grid.Column="2"
-       Text="Page 1 of 1"
-        VerticalAlignment="Center"
-              HorizontalAlignment="Center"
-         MinWidth="100"
-         TextAlignment="Center"
-          Margin="10,0,10,0"/>
+  Text="Page 1 of 1"
+ VerticalAlignment="Center"
+    HorizontalAlignment="Center"
+   MinWidth="100"
+     TextAlignment="Center"
+   Margin="10,0,10,0"/>
             
  <Button x:Name="NextPageButton" 
            Grid.Column="3"
      Content="Next ►" 
   Width="80" 
       Height="25"
-           Margin="10,0,0,0"
+  Margin="10,0,0,0"
       Click="NextPageButton_Click"
       IsEnabled="False"/>
         </Grid>
-        
+     
      <!-- Status Bar -->
-    <StatusBar Grid.Row="5" Height="25">
+    <StatusBar Grid.Row="6" Height="25">
     <StatusBarItem>
   <TextBlock x:Name="StatusText" Text="Ready"/>
    </StatusBarItem>

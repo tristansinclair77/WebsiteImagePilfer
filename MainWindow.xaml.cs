@@ -31,7 +31,8 @@ namespace WebsiteImagePilfer
     {
  private readonly HttpClient _httpClient;
  private ObservableCollection<ImageDownloadItem> _imageItems;
-        private ObservableCollection<ImageDownloadItem> _currentPageItems; // Items for current page
+ private ObservableCollection<ImageDownloadItem> _currentPageItems; // Items for current page
+ private ObservableCollection<ImageDownloadItem> _filteredImageItems; // Filtered items based on status
  private string _downloadFolder;
    private CancellationTokenSource? _cancellationTokenSource;
  private DownloadSettings _settings;
@@ -44,49 +45,73 @@ namespace WebsiteImagePilfer
 
     public MainWindow()
     {
-        InitializeComponent();
-        _httpClient = new HttpClient();
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+      InitializeComponent();
+    _httpClient = new HttpClient();
+      _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
         _httpClient.Timeout = TimeSpan.FromSeconds(30);
-        _imageItems = new ObservableCollection<ImageDownloadItem>();
-        _currentPageItems = new ObservableCollection<ImageDownloadItem>();
+ _imageItems = new ObservableCollection<ImageDownloadItem>();
+     _filteredImageItems = new ObservableCollection<ImageDownloadItem>();
+     _currentPageItems = new ObservableCollection<ImageDownloadItem>();
         ImageList.ItemsSource = _currentPageItems; // Bind to current page items
         _scannedImageUrls = new List<string>();
 
 	    // Load portable settings
 	    var appSettings = PortableSettingsManager.LoadSettings();
 	    _settings = new DownloadSettings();
-	    _settings.LoadFromPortableSettings();
+	  _settings.LoadFromPortableSettings();
 
-        // Apply items per page from settings
-        _itemsPerPage = _settings.ItemsPerPage;
+ // Apply items per page from settings
+    _itemsPerPage = _settings.ItemsPerPage;
 
         // Set default download folder from settings or use default
         _downloadFolder = string.IsNullOrEmpty(appSettings.DownloadFolder)
-	        ? IOPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "WebsiteImages")
-	        : appSettings.DownloadFolder;
+	  ? IOPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "WebsiteImages")
+	     : appSettings.DownloadFolder;
         FolderTextBox.Text = _downloadFolder;
 
-        // Load last URL if available
+     // Load last URL if available
         if (!string.IsNullOrEmpty(appSettings.LastUrl))
         {
-	        UrlTextBox.Text = appSettings.LastUrl;
+	    UrlTextBox.Text = appSettings.LastUrl;
         }
 
-        // Set up column width monitoring
+    // Set up column width monitoring
         PreviewColumn.Width = 150; // Ensure it starts with a known width
-        _lastPreviewColumnWidth = 150;
+     _lastPreviewColumnWidth = 150;
     
         // Setup debounce timer for column resize
         _columnResizeTimer = new System.Timers.Timer(500); // 500ms debounce
-        _columnResizeTimer.AutoReset = false;
-        _columnResizeTimer.Elapsed += ColumnResizeTimer_Elapsed;
-      
-        // Monitor column width changes by polling
-        var columnWidthMonitor = new System.Windows.Threading.DispatcherTimer();
+ _columnResizeTimer.AutoReset = false;
+      _columnResizeTimer.Elapsed += ColumnResizeTimer_Elapsed;
+   
+     // Monitor column width changes by polling
+   var columnWidthMonitor = new System.Windows.Threading.DispatcherTimer();
         columnWidthMonitor.Interval = TimeSpan.FromMilliseconds(100); // Check every 100ms
-        columnWidthMonitor.Tick += (s, e) => CheckColumnWidthChanged();
-        columnWidthMonitor.Start();
+    columnWidthMonitor.Tick += (s, e) => CheckColumnWidthChanged();
+      columnWidthMonitor.Start();
+        
+    // Subscribe to collection changes to update filter when status changes
+        // IMPORTANT: This must be AFTER InitializeComponent() so checkboxes exist
+  _imageItems.CollectionChanged += (s, e) => 
+        {
+if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add ||
+      e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+  {
+        ApplyStatusFilter();
+            }
+    };
+  
+        // Subscribe to property changes on items to update filter when status changes
+    _imageItems.CollectionChanged += (s, e) =>
+        {
+            if (e.NewItems != null)
+ {
+         foreach (ImageDownloadItem item in e.NewItems)
+     {
+        item.PropertyChanged += ImageItem_PropertyChanged;
+     }
+          }
+    };
     }
 
     private void CheckColumnWidthChanged()
@@ -96,13 +121,13 @@ namespace WebsiteImagePilfer
         {
             double widthDifference = Math.Abs(PreviewColumn.ActualWidth - _lastPreviewColumnWidth);
       
-            // If width changed by more than 10 pixels, reload previews
+  // If width changed by more than 10 pixels, reload previews
             if (widthDifference > 10)
-            {
-                // Restart the debounce timer
-                _columnResizeTimer?.Stop();
-                _columnResizeTimer?.Start();
-            }
+  {
+             // Restart the debounce timer
+    _columnResizeTimer?.Stop();
+       _columnResizeTimer?.Start();
+       }
         }
     }
 
@@ -1657,15 +1682,15 @@ Verb = "open"
 
         private void UpdatePagination()
   {
-      _totalPages = (int)Math.Ceiling((double)_imageItems.Count / _itemsPerPage);
+      _totalPages = (int)Math.Ceiling((double)_filteredImageItems.Count / _itemsPerPage);
     if (_totalPages == 0) _totalPages = 1;
-            
+          
    // Ensure current page is valid
    if (_currentPage > _totalPages) _currentPage = _totalPages;
   if (_currentPage < 1) _currentPage = 1;
 
    // Update page info text
-    PageInfoText.Text = $"Page {_currentPage} of {_totalPages} ({_imageItems.Count} images)";
+    PageInfoText.Text = $"Page {_currentPage} of {_totalPages} ({_filteredImageItems.Count} filtered / {_imageItems.Count} total images)";
    
    // Update button states
     PrevPageButton.IsEnabled = _currentPage > 1;
@@ -1675,135 +1700,229 @@ Verb = "open"
   LoadCurrentPage();
  }
 
-   private void LoadCurrentPage()
-        {
+private void LoadCurrentPage()
+  {
        _currentPageItems.Clear();
-            
+         
       int startIndex = (_currentPage - 1) * _itemsPerPage;
-   int endIndex = Math.Min(startIndex + _itemsPerPage, _imageItems.Count);
+   int endIndex = Math.Min(startIndex + _itemsPerPage, _filteredImageItems.Count);
 
    for (int i = startIndex; i < endIndex; i++)
   {
-    _currentPageItems.Add(_imageItems[i]);
+    _currentPageItems.Add(_filteredImageItems[i]);
    }
+      }
+
+      private void ImageItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+         // When an item's status changes, reapply the filter
+            if (e.PropertyName == nameof(ImageDownloadItem.Status))
+          {
+      ApplyStatusFilter();
+       }
+   }
+
+        private void StatusFilter_Changed(object sender, RoutedEventArgs e)
+        {
+            ApplyStatusFilter();
         }
 
- private void PrevPageButton_Click(object sender, RoutedEventArgs e)
-      {
-    if (_currentPage > 1)
-   {
-    _currentPage--;
-    UpdatePagination();
-         }
- }
-
-      private void NextPageButton_Click(object sender, RoutedEventArgs e)
+        private void SelectAllStatus_Click(object sender, RoutedEventArgs e)
         {
- if (_currentPage < _totalPages)
-   {
-     _currentPage++;
-    UpdatePagination();
-    }
- }
-
-     private async Task<string?> TryFindFullResolutionUrlAsync(string previewUrl, CancellationToken cancellationToken)
-        {
-  try
-   {
-  // KEMONO.CR SPECIFIC PATTERN - NO HEAD REQUEST NEEDED
-      // Preview: https://img.kemono.cr/thumbnail/data/...
-  // Full:    https://n4.kemono.cr/data/...?f=filename
-      if (previewUrl.Contains("kemono.cr"))
- {
-        if (previewUrl.Contains("/thumbnail/"))
-   {
-       // Transform preview to full-res
-  var fullResUrl = previewUrl.Replace("/thumbnail/", "/").Replace("img.kemono.cr", "n4.kemono.cr");
-      System.Diagnostics.Debug.WriteLine($"Kemono.cr preview detected, transforming to full-res URL");
-       return fullResUrl;
-       }
- else if (previewUrl.Contains("n4.kemono.cr") || previewUrl.Contains("n5.kemono.cr"))
-   {
-     // Already a full-res URL (n4/n5 subdomain)
-     System.Diagnostics.Debug.WriteLine($"Kemono.cr full-res URL detected (already full-res)");
-return previewUrl; // Return same URL to indicate it's already full-res
-   }
- }
-
-  // Pattern 1: Remove "/thumbnail/" from path (generic pattern)
-      if (previewUrl.Contains("/thumbnail/"))
-    {
-   var fullResUrl = previewUrl.Replace("/thumbnail/", "/");
-if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
-   {
-   return fullResUrl;
- }
-    }
-
-   // Pattern 2: Remove size suffixes
-   var sizePatterns = new[] { "_800x800", "_small", "_medium", "_thumb", "_preview", "-thumb", "-preview" };
-      foreach (var pattern in sizePatterns)
- {
-    if (previewUrl.Contains(pattern))
-   {
-      var fullResUrl = previewUrl.Replace(pattern, "");
-   if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
-    {
-       return fullResUrl;
- }
-       }
- }
-
-   // Pattern 3: Replace "thumb" or "preview" with empty
-      if (previewUrl.Contains("thumb") || previewUrl.Contains("preview"))
-   {
-      var fullResUrl = previewUrl.Replace("thumb", "").Replace("preview", "");
-   if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
-      {
-  return fullResUrl;
-    }
-    }
-
-      // No transformation needed/found - return original URL
-  System.Diagnostics.Debug.WriteLine($"No full-res pattern found, URL is likely already full-res or no transformation available");
-return previewUrl; // Return original URL (it's likely already full-res from scan)
-        }
-       catch (Exception ex)
-    {
-     System.Diagnostics.Debug.WriteLine($"TryFindFullResolutionUrlAsync exception: {ex.Message}");
-  return previewUrl; // On error, assume URL is fine as-is
- }
+        FilterReadyCheckBox.IsChecked = true;
+            FilterDoneCheckBox.IsChecked = true;
+       FilterBackupCheckBox.IsChecked = true;
+   FilterDuplicateCheckBox.IsChecked = true;
+    FilterFailedCheckBox.IsChecked = true;
+     FilterSkippedCheckBox.IsChecked = true;
+  FilterCancelledCheckBox.IsChecked = true;
+       FilterDownloadingCheckBox.IsChecked = true;
+            // Filter will update automatically via the Checked event
   }
 
-        private async Task<bool> TestUrlExistsAsync(string url, CancellationToken cancellationToken)
+  private void ClearAllStatus_Click(object sender, RoutedEventArgs e)
         {
-     try
+            FilterReadyCheckBox.IsChecked = false;
+      FilterDoneCheckBox.IsChecked = false;
+         FilterBackupCheckBox.IsChecked = false;
+            FilterDuplicateCheckBox.IsChecked = false;
+          FilterFailedCheckBox.IsChecked = false;
+            FilterSkippedCheckBox.IsChecked = false;
+    FilterCancelledCheckBox.IsChecked = false;
+         FilterDownloadingCheckBox.IsChecked = false;
+   // Filter will update automatically via the Unchecked event
+        }
+
+        private void ApplyStatusFilter()
+        {
+        // Safety check: Ensure checkboxes are initialized
+         if (FilterReadyCheckBox == null || FilterDoneCheckBox == null || 
+        FilterBackupCheckBox == null || FilterDuplicateCheckBox == null ||
+      FilterFailedCheckBox == null || FilterSkippedCheckBox == null ||
+     FilterCancelledCheckBox == null || FilterDownloadingCheckBox == null)
+    {
+       // Checkboxes not yet initialized, skip filtering
+     return;
+       }
+
+        // Safety check: Ensure collections are initialized
+         if (_filteredImageItems == null || _imageItems == null)
+            {
+  return;
+ }
+
+          _filteredImageItems.Clear();
+
+        foreach (var item in _imageItems)
+    {
+ bool include = false;
+
+       // Check each filter
+         if (FilterReadyCheckBox.IsChecked == true && item.Status == "Ready")
+          include = true;
+ else if (FilterDoneCheckBox.IsChecked == true && item.Status == "✓ Done")
+     include = true;
+   else if (FilterBackupCheckBox.IsChecked == true && item.Status == "✓ Backup")
+include = true;
+      else if (FilterDuplicateCheckBox.IsChecked == true && item.Status == "⊘ Duplicate")
+ include = true;
+       else if (FilterFailedCheckBox.IsChecked == true && item.Status == "✗ Failed")
+    include = true;
+        else if (FilterSkippedCheckBox.IsChecked == true && item.Status.Contains("⊘ Skipped"))
+        include = true;
+    else if (FilterCancelledCheckBox.IsChecked == true && item.Status == "⊘ Canceled")
+    include = true;
+    else if (FilterDownloadingCheckBox.IsChecked == true && 
+    (item.Status == "Downloading..." || item.Status == "Checking..." || item.Status == "Finding full-res..."))
+      include = true;
+
+  if (include)
  {
-       var testStart = DateTime.Now;
-   var request = new HttpRequestMessage(HttpMethod.Head, url);
- 
-// Add timeout for HEAD request (5 seconds max)
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-     using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
- 
-        var response = await _httpClient.SendAsync(request, linkedCts.Token);
+      _filteredImageItems.Add(item);
+  }
+}
+
+            // Reset to page 1 and update pagination
+       _currentPage = 1;
+         UpdatePagination();
+}
+
+        private void PrevPageButton_Click(object sender, RoutedEventArgs e)
+ {
+            if (_currentPage > 1)
+     {
+             _currentPage--;
+                UpdatePagination();
+            }
+        }
+
+  private void NextPageButton_Click(object sender, RoutedEventArgs e)
+        {
+       if (_currentPage < _totalPages)
+     {
+          _currentPage++;
+    UpdatePagination();
+            }
+        }
+
+        private async Task<string?> TryFindFullResolutionUrlAsync(string previewUrl, CancellationToken cancellationToken)
+      {
+   try
+            {
+      // KEMONO.CR SPECIFIC PATTERN - NO HEAD REQUEST NEEDED
+        // Preview: https://img.kemono.cr/thumbnail/data/...
+    // Full:    https://n4.kemono.cr/data/...?f=filename
+                if (previewUrl.Contains("kemono.cr"))
+                {
+            if (previewUrl.Contains("/thumbnail/"))
+          {
+        // Transform preview to full-res
+         var fullResUrl = previewUrl.Replace("/thumbnail/", "/").Replace("img.kemono.cr", "n4.kemono.cr");
+      System.Diagnostics.Debug.WriteLine($"Kemono.cr preview detected, transforming to full-res URL");
+      return fullResUrl;
+     }
+    else if (previewUrl.Contains("n4.kemono.cr") || previewUrl.Contains("n5.kemono.cr"))
+           {
+         // Already a full-res URL (n4/n5 subdomain)
+       System.Diagnostics.Debug.WriteLine($"Kemono.cr full-res URL detected (already full-res)");
+       return previewUrl; // Return same URL to indicate it's already full-res
+             }
+             }
+
+                // Pattern 1: Remove "/thumbnail/" from path (generic pattern)
+    if (previewUrl.Contains("/thumbnail/"))
+          {
+              var fullResUrl = previewUrl.Replace("/thumbnail/", "/");
+               if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
+                    {
+    return fullResUrl;
+             }
+  }
+
+          // Pattern 2: Remove size suffixes
+            var sizePatterns = new[] { "_800x800", "_small", "_medium", "_thumb", "_preview", "-thumb", "-preview" };
+      foreach (var pattern in sizePatterns)
+         {
+         if (previewUrl.Contains(pattern))
+{
+                 var fullResUrl = previewUrl.Replace(pattern, "");
+             if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
+      {
+      return fullResUrl;
+         }
+        }
+         }
+
+                // Pattern 3: Replace "thumb" or "preview" with empty
+    if (previewUrl.Contains("thumb") || previewUrl.Contains("preview"))
+         {
+                    var fullResUrl = previewUrl.Replace("thumb", "").Replace("preview", "");
+        if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
+       {
+    return fullResUrl;
+}
+     }
+
+          // No transformation needed/found - return original URL
+                System.Diagnostics.Debug.WriteLine($"No full-res pattern found, URL is likely already full-res or no transformation available");
+          return previewUrl; // Return original URL (it's likely already full-res from scan)
+     }
+      catch (Exception ex)
+       {
+            System.Diagnostics.Debug.WriteLine($"TryFindFullResolutionUrlAsync exception: {ex.Message}");
+        return previewUrl; // On error, assume URL is fine as-is
+            }
+        }
+
+        private async Task<bool> TestUrlExistsAsync(string url, CancellationToken cancellationToken)
+   {
+            try
+            {
+     var testStart = DateTime.Now;
+      var request = new HttpRequestMessage(HttpMethod.Head, url);
+
+    // Add timeout for HEAD request (5 seconds max)
+      using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+      using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+                var response = await _httpClient.SendAsync(request, linkedCts.Token);
       var elapsed = (DateTime.Now - testStart).TotalMilliseconds;
 
     System.Diagnostics.Debug.WriteLine($"HEAD request to {url.Substring(0, Math.Min(60, url.Length))}... took {elapsed}ms - Status: {response.StatusCode}");
-       
-    return response.IsSuccessStatusCode;
-         }
- catch (TaskCanceledException)
-  {
- System.Diagnostics.Debug.WriteLine($"HEAD request timed out for {url.Substring(0, Math.Min(60, url.Length))}...");
-   return false;
-   }
-  catch (Exception ex)
- {
-    System.Diagnostics.Debug.WriteLine($"HEAD request failed for {url.Substring(0, Math.Min(60, url.Length))}...: {ex.Message}");
-     return false;
-   }
-   }
+
+      return response.IsSuccessStatusCode;
+    }
+            catch (TaskCanceledException)
+          {
+                System.Diagnostics.Debug.WriteLine($"HEAD request timed out for {url.Substring(0, Math.Min(60, url.Length))}...");
+       return false;
+            }
+    catch (Exception ex)
+   {
+ System.Diagnostics.Debug.WriteLine($"HEAD request failed for {url.Substring(0, Math.Min(60, url.Length))}...: {ex.Message}");
+ return false;
+ }
+     }
     }
 
     public class ImageDownloadItem : INotifyPropertyChanged
