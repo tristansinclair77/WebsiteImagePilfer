@@ -156,6 +156,14 @@ IsReadOnly="True"/>
     SelectionMode="Extended"
     SelectionChanged="ImageList_SelectionChanged"
   MouseDoubleClick="ImageList_MouseDoubleClick">
+     <ListView.ContextMenu>
+        <ContextMenu>
+        <MenuItem Header="Download (Force)" Click="ContextMenu_Download_Click" />
+ <MenuItem Header="Reload Preview" Click="ContextMenu_ReloadPreview_Click" />
+       <Separator />
+        <MenuItem Header="Cancel Download" Click="ContextMenu_Cancel_Click" />
+            </ContextMenu>
+          </ListView.ContextMenu>
    <ListView.View>
      <GridView>
  <GridViewColumn Header="#" Width="40">

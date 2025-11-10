@@ -571,7 +571,7 @@ MessageBox.Show($"Operation cancelled. Downloaded {downloadedCount} of {readyIte
     {
       MessageBox.Show($"Image already downloaded: {item.FileName}", "Already Downloaded", 
            MessageBoxButton.OK, MessageBoxImage.Information);
-       return;
+ return;
       }
 
   var originalStatus = item.Status;
@@ -580,20 +580,219 @@ MessageBox.Show($"Operation cancelled. Downloaded {downloadedCount} of {readyIte
          try
    {
    await DownloadSingleItemAsync(item, CancellationToken.None);
-         
+   
              if (item.Status == "✓ Done")
          {
        StatusText.Text = $"Downloaded: {item.FileName}";
-        }
    }
+ }
      catch (Exception ex)
    {
   item.Status = "✗ Failed";
           item.ErrorMessage = ex.Message;
-          MessageBox.Show($"Failed to download: {ex.Message}", "Download Error", 
+    MessageBox.Show($"Failed to download: {ex.Message}", "Download Error", 
   MessageBoxButton.OK, MessageBoxImage.Error);
      }
         }
+
+        private async void ContextMenu_Download_Click(object sender, RoutedEventArgs e)
+    {
+   // Get the clicked item from the ListView's selected item
+          if (ImageList.SelectedItem is ImageDownloadItem item)
+     {
+              await DownloadSingleImageWithForceAsync(item);
+            }
+        }
+
+        private async Task DownloadSingleImageWithForceAsync(ImageDownloadItem item)
+     {
+            // This method bypasses duplicate protection and downloads the file again
+ // with a numbered suffix if a file name conflict exists
+         
+       var originalStatus = item.Status;
+            item.Status = "Downloading...";
+
+ try
+            {
+       // Download logic similar to DownloadSingleItemAsync but bypasses duplicate check
+      string urlToDownload = item.Url;
+              bool usedBackup = false;
+
+      // Try to find full-resolution version if setting allows
+           if (!_settings.SkipFullResolutionCheck)
+         {
+         try
+        {
+               item.Status = "Finding full-res...";
+      var fullResUrl = await TryFindFullResolutionUrlAsync(item.Url, CancellationToken.None);
+  
+      if (fullResUrl != null && fullResUrl != item.Url)
+            {
+ urlToDownload = fullResUrl;
+               usedBackup = false;
+}
+               else if (fullResUrl == item.Url)
+       {
+    usedBackup = false;
+ }
+            else
+     {
+   usedBackup = true;
+            }
+}
+            catch
+        {
+    usedBackup = true;
+                 }
+    }
+
+    var fileName = item.FileName;
+            if (string.IsNullOrEmpty(fileName) || fileName.StartsWith("image_"))
+       {
+             var uri = new Uri(urlToDownload);
+          
+          if (uri.Query.Contains("?f=") || uri.Query.Contains("&f="))
+    {
+      var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
+           var fParam = queryParams["f"];
+            if (!string.IsNullOrEmpty(fParam))
+  {
+     fileName = fParam;
+     }
+          }
+      
+           if (string.IsNullOrEmpty(fileName))
+       {
+ fileName = IOPath.GetFileName(uri.LocalPath);
+   }
+      
+           if (string.IsNullOrEmpty(fileName) || !IOPath.HasExtension(fileName))
+      {
+            fileName = $"image_{DateTime.Now:yyyyMMddHHmmss}_{Guid.NewGuid().ToString().Substring(0, 8)}.jpg";
+    }
+            
+        fileName = SanitizeFileName(fileName);
+         }
+
+    // Check for file name conflicts and add a number if needed
+                var filePath = IOPath.Combine(_downloadFolder, fileName);
+           if (File.Exists(filePath))
+  {
+           // File exists - add a number to the filename
+         var extension = IOPath.GetExtension(fileName);
+  var nameWithoutExtension = IOPath.GetFileNameWithoutExtension(fileName);
+        int counter = 1;
+       
+ do
+     {
+         fileName = $"{nameWithoutExtension} ({counter}){extension}";
+              filePath = IOPath.Combine(_downloadFolder, fileName);
+          counter++;
+   }
+            while (File.Exists(filePath));
+ 
+           item.FileName = fileName;
+           }
+
+    item.Status = "Downloading...";
+
+         // Download the image
+         var imageBytes = await _httpClient.GetByteArrayAsync(urlToDownload, CancellationToken.None);
+
+     await File.WriteAllBytesAsync(filePath, imageBytes, CancellationToken.None);
+
+           if (usedBackup)
+      {
+         item.Status = "✓ Backup";
+        }
+     else
+    {
+            item.Status = "✓ Done";
+         }
+
+    item.ErrorMessage = "";
+   StatusText.Text = $"Downloaded (forced): {item.FileName}";
+ }
+          catch (Exception ex)
+          {
+     item.Status = "✗ Failed";
+ item.ErrorMessage = ex.Message;
+        MessageBox.Show($"Failed to download: {ex.Message}", "Download Error", 
+          MessageBoxButton.OK, MessageBoxImage.Error);
+          }
+   }
+
+        private async void ContextMenu_ReloadPreview_Click(object sender, RoutedEventArgs e)
+        {
+ // Get the clicked item from the ListView's selected item
+  if (ImageList.SelectedItem is ImageDownloadItem item)
+       {
+ await ReloadSinglePreviewAsync(item);
+         }
+        }
+
+        private async Task ReloadSinglePreviewAsync(ImageDownloadItem item)
+        {
+            if (!_settings.LoadPreviews)
+            {
+    MessageBox.Show("Preview loading is disabled in Settings. Please enable 'Load preview images during scan' to use this feature.", 
+             "Preview Loading Disabled", MessageBoxButton.OK, MessageBoxImage.Information);
+      return;
+            }
+
+        try
+  {
+                StatusText.Text = $"Reloading preview for {item.FileName}...";
+                
+  // Clear the existing preview
+      item.PreviewImage = null;
+  
+                // Reload the preview
+     var newPreview = await LoadPreviewImageAsync(item.Url);
+    if (newPreview != null)
+           {
+            item.PreviewImage = newPreview;
+             StatusText.Text = $"Preview reloaded for {item.FileName}";
+          }
+   else
+ {
+          StatusText.Text = $"Failed to reload preview for {item.FileName}";
+               MessageBox.Show($"Failed to reload preview for {item.FileName}. The image URL may be invalid or unavailable.", 
+         "Preview Load Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+       }
+            }
+catch (Exception ex)
+            {
+StatusText.Text = $"Error reloading preview: {ex.Message}";
+    MessageBox.Show($"Error reloading preview: {ex.Message}", "Preview Error", 
+   MessageBoxButton.OK, MessageBoxImage.Error);
+       }
+}
+
+        private void ContextMenu_Cancel_Click(object sender, RoutedEventArgs e)
+      {
+   // Get the clicked item from the ListView's selected item
+      if (ImageList.SelectedItem is ImageDownloadItem item)
+    {
+       CancelSingleDownload(item);
+        }
+        }
+
+        private void CancelSingleDownload(ImageDownloadItem item)
+        {
+     // Check if the item is currently downloading
+      if (item.Status == "Downloading..." || item.Status == "Checking..." || item.Status == "Finding full-res...")
+       {
+                item.Status = "⊘ Canceled";
+    item.ErrorMessage = "Canceled by user";
+       StatusText.Text = $"Canceled download: {item.FileName}";
+            }
+     else
+            {
+       MessageBox.Show($"Cannot cancel - item is not currently downloading.\nCurrent status: {item.Status}", 
+        "Cannot Cancel", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+}
 
         private async Task<int> DownloadImagesFromListAsync(CancellationToken cancellationToken)
   {
