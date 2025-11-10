@@ -20,10 +20,11 @@ xmlns:local="clr-namespace:WebsiteImagePilfer"
        <Grid.ColumnDefinitions>
       <ColumnDefinition Width="*"/>
       <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="Auto"/>
+        <ColumnDefinition Width="Auto"/>
+  <ColumnDefinition Width="Auto"/>
     <ColumnDefinition Width="Auto"/>
       </Grid.ColumnDefinitions>
-      
+    
   <TextBox x:Name="UrlTextBox" 
         Grid.Column="0"
     Height="30" 
@@ -39,18 +40,25 @@ Text="https://example.com"/>
         Height="30"
        Margin="0,0,5,0"
 Click="ScanOnlyButton_Click"/>
+
+   <CheckBox x:Name="FastScanCheckBox"
+             Grid.Column="2"
+ Content="Fast"
+     VerticalAlignment="Center"
+             Margin="0,0,10,0"
+       ToolTip="Fast: Quick scan (5s wait)&#x0a;Unchecked: Thorough scan (waits for all lazy-loaded images)"/>
   
    <Button x:Name="DownloadButton" 
-Grid.Column="2"
+Grid.Column="3"
   Content="Download" 
      Width="100" 
-        Height="30"
+      Height="30"
        Margin="0,0,5,0"
-            IsEnabled="False"
+         IsEnabled="False"
 Click="DownloadButton_Click"/>
-       
+  
     <Button x:Name="CancelButton" 
-     Grid.Column="3"
+     Grid.Column="4"
     Content="Cancel" 
          Width="80" 
        Height="30"

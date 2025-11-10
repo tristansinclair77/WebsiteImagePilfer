@@ -61,96 +61,100 @@ namespace WebsiteImagePilfer
 
    private async void ScanOnlyButton_Click(object sender, RoutedEventArgs e)
  {
-            string url = UrlTextBox.Text.Trim();
+      string url = UrlTextBox.Text.Trim();
           
      // Validate URL
-            if (string.IsNullOrEmpty(url))
+ if (string.IsNullOrEmpty(url))
    {
          MessageBox.Show("Please enter a valid URL.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
          return;
             }
 
-         if (!Uri.IsWellFormedUriString(url, UriKind.Absolute))
-            {
+    if (!Uri.IsWellFormedUriString(url, UriKind.Absolute))
+      {
            MessageBox.Show("Please enter a valid URL (including http:// or https://).", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-             return;
+      return;
             }
 
             // Save last URL
         Properties.Settings.Default.LastUrl = url;
-            Properties.Settings.Default.Save();
+   Properties.Settings.Default.Save();
 
             // Setup cancellation token
-            _cancellationTokenSource = new CancellationTokenSource();
+    _cancellationTokenSource = new CancellationTokenSource();
 
-        // Update UI state
+   // Update UI state
          ScanOnlyButton.IsEnabled = false;
  DownloadButton.IsEnabled = false;
-            CancelButton.IsEnabled = true;
-            _imageItems.Clear();
-            _scannedImageUrls.Clear();
-     DownloadProgress.Value = 0;
+       FastScanCheckBox.IsEnabled = false;
+     CancelButton.IsEnabled = true;
+ _imageItems.Clear();
+    _scannedImageUrls.Clear();
+  DownloadProgress.Value = 0;
 
          try
        {
    StatusText.Text = "Scanning webpage...";
-    
-        // Get image URLs
-   _scannedImageUrls = await GetImageUrlsWithSeleniumAsync(url, _cancellationTokenSource.Token);
+  
+        // Get image URLs - use fast or thorough scan based on checkbox
+       bool useFastScan = FastScanCheckBox.IsChecked == true;
+   _scannedImageUrls = await GetImageUrlsWithSeleniumAsync(url, _cancellationTokenSource.Token, useFastScan);
     
  if (_cancellationTokenSource.Token.IsCancellationRequested)
-       {
+ {
 StatusText.Text = "Scan cancelled.";
-          return;
+ return;
           }
 
          if (_scannedImageUrls.Count == 0)
-            {
+         {
        MessageBox.Show("No images found on the webpage.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
         StatusText.Text = "No images found.";
            return;
      }
 
-      // Display found images in list (without downloading)
+ // Display found images in list (without downloading)
         foreach (var imageUrl in _scannedImageUrls)
-                {
-           var uri = new Uri(imageUrl);
-          var fileName = IOPath.GetFileName(uri.LocalPath);
-   if (string.IsNullOrEmpty(fileName) || !IOPath.HasExtension(fileName))
        {
-          fileName = $"image_{_imageItems.Count + 1}.jpg";
-             }
+           var uri = new Uri(imageUrl);
+   var fileName = IOPath.GetFileName(uri.LocalPath);
+   if (string.IsNullOrEmpty(fileName) || !IOPath.HasExtension(fileName))
+  {
+       fileName = $"image_{_imageItems.Count + 1}.jpg";
+      }
           fileName = SanitizeFileName(fileName);
 
-           var item = new ImageDownloadItem
+  var item = new ImageDownloadItem
   {
   Url = imageUrl,
-             Status = "Ready",
+     Status = "Ready",
     FileName = fileName
     };
-           _imageItems.Add(item);
+_imageItems.Add(item);
       }
 
-                StatusText.Text = $"Found {_scannedImageUrls.Count} images. Click 'Download' to save them.";
-                DownloadButton.IsEnabled = true;
- MessageBox.Show($"Found {_scannedImageUrls.Count} images!\n\nReview the list and click 'Download' when ready.", 
-         "Scan Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+        string scanType = useFastScan ? "Fast" : "Thorough";
+          StatusText.Text = $"Found {_scannedImageUrls.Count} images ({scanType} scan). Click 'Download' to save them.";
+    DownloadButton.IsEnabled = true;
+ MessageBox.Show($"Found {_scannedImageUrls.Count} images using {scanType} scan!\n\nReview the list and click 'Download' when ready.", 
+  "Scan Complete", MessageBoxButton.OK, MessageBoxImage.Information);
     }
  catch (OperationCanceledException)
       {
     StatusText.Text = "Scan cancelled by user.";
-    }
-            catch (Exception ex)
-            {
+  }
+ catch (Exception ex)
+      {
          MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
     StatusText.Text = "Error occurred during scan.";
     }
       finally
         {
              ScanOnlyButton.IsEnabled = true;
+        FastScanCheckBox.IsEnabled = true;
         CancelButton.IsEnabled = false;
-   _cancellationTokenSource?.Dispose();
-           _cancellationTokenSource = null;
+ _cancellationTokenSource?.Dispose();
+       _cancellationTokenSource = null;
     }
         }
 
@@ -383,19 +387,19 @@ return;
   }
         }
 
-        private async Task<List<string>> GetImageUrlsWithSeleniumAsync(string url, CancellationToken cancellationToken)
-        {
+        private async Task<List<string>> GetImageUrlsWithSeleniumAsync(string url, CancellationToken cancellationToken, bool useFastScan = false)
+     {
  var imageUrls = new HashSet<string>();
   IWebDriver? driver = null;
 
-     await Task.Run(() =>
+await Task.Run(() =>
     {
             try
       {
    StatusText.Dispatcher.Invoke(() => StatusText.Text = "Launching browser...");
 
        // Setup Chrome options
-         var options = new ChromeOptions();
+      var options = new ChromeOptions();
       options.AddArgument("--headless=new");
       options.AddArgument("--disable-gpu");
      options.AddArgument("--no-sandbox");
@@ -406,51 +410,69 @@ return;
         options.PageLoadStrategy = PageLoadStrategy.Normal;
 
    driver = new ChromeDriver(options);
-           driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(60);
+      driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(60);
     driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(10);
 
         StatusText.Dispatcher.Invoke(() => StatusText.Text = "Loading page with JavaScript...");
 
  // Navigate to URL with retry logic
  int retryCount = 0;
-          bool pageLoaded = false;
-            
+       bool pageLoaded = false;
+  
   while (!pageLoaded && retryCount < 3)
 {
       try
     {
-         driver.Navigate().GoToUrl(url);
+     driver.Navigate().GoToUrl(url);
         pageLoaded = true;
              }
      catch (WebDriverTimeoutException)
 {
-           retryCount++;
+    retryCount++;
     if (retryCount >= 3) throw;
        StatusText.Dispatcher.Invoke(() => StatusText.Text = $"Page load timeout, retrying ({retryCount}/3)...");
      System.Threading.Thread.Sleep(2000);
      }
 }
 
-      StatusText.Dispatcher.Invoke(() => StatusText.Text = "Waiting for images to load...");
+  if (useFastScan)
+  {
+   // FAST SCAN: Original behavior - single wait
+      StatusText.Dispatcher.Invoke(() => StatusText.Text = "Fast scan: Waiting for images to load...");
+        System.Threading.Thread.Sleep(5000); // Wait 5 seconds
+
+    // Try to scroll down to trigger lazy loading
+      try
+ {
+        var js = (IJavaScriptExecutor)driver;
+    js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight);");
+   System.Threading.Thread.Sleep(2000);
+            }
+   catch { /* Scroll failed, continue anyway */ }
+     }
+else
+        {
+            // THOROUGH SCAN: Dynamic waiting for lazy-loaded content
+      StatusText.Dispatcher.Invoke(() => StatusText.Text = "Thorough scan: Waiting for images to load...");
     
-            // DYNAMIC WAITING: Keep checking for new images
+       // DYNAMIC WAITING: Keep checking for new images
      int previousCount = 0;
-         int stableCount = 0;
+int stableCount = 0;
   int maxStableChecks = 3; // Stop after 3 checks with no new images
   int checkInterval = 5000; // Check every 5 seconds
 
    while (stableCount < maxStableChecks && !cancellationToken.IsCancellationRequested)
         {
-          // Scroll to trigger lazy loading
-          try
+     // Scroll to trigger lazy loading
+      try
              {
   var js = (IJavaScriptExecutor)driver;
-     js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight);");
-        System.Threading.Thread.Sleep(1000);
+  js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight);");
+  System.Threading.Thread.Sleep(1000);
           js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight / 2);");
-      System.Threading.Thread.Sleep(1000);
+ System.Threading.Thread.Sleep(1000);
       js.ExecuteScript("window.scrollTo(0, 0);");
-            }
+ }
   catch { /* Scroll failed, continue anyway */ }
 
         // Wait for images to load
@@ -463,44 +485,45 @@ try
     {
            var imgElements = driver.FindElements(By.TagName("img"));
         foreach (var img in imgElements)
-    {
-         if (cancellationToken.IsCancellationRequested) break;
+ {
+  if (cancellationToken.IsCancellationRequested) break;
 
  try
           {
     var src = img.GetAttribute("src");
-               if (!string.IsNullOrEmpty(src) && !src.StartsWith("data:"))
+    if (!string.IsNullOrEmpty(src) && !src.StartsWith("data:"))
          {
   currentImages.Add(src);
-           }
+     }
         }
     catch { /* Skip invalid elements */ }
-       }
-       }
+}
+   }
       catch { /* Continue if extraction fails */ }
 
-       // Check if we found new images
+     // Check if we found new images
        int currentCount = currentImages.Count;
         if (currentCount > previousCount)
-          {
+  {
          stableCount = 0; // Reset counter - we found new images!
        StatusText.Dispatcher.Invoke(() => 
-         StatusText.Text = $"Found {currentCount} images so far, continuing scan...");
+     StatusText.Text = $"Thorough scan: Found {currentCount} images so far, continuing...");
   previousCount = currentCount;
-          imageUrls.UnionWith(currentImages);
+    imageUrls.UnionWith(currentImages);
        }
     else
-      {
+   {
            stableCount++; // No new images found
   StatusText.Dispatcher.Invoke(() => 
-      StatusText.Text = $"Scan stable at {currentCount} images ({stableCount}/{maxStableChecks} checks)...");
-       }
+      StatusText.Text = $"Thorough scan: Stable at {currentCount} images ({stableCount}/{maxStableChecks} checks)...");
+}
   }
+    }
 
       StatusText.Dispatcher.Invoke(() => StatusText.Text = "Extracting final image URLs...");
 
      // Final comprehensive extraction
-     var renderedHtml = driver.PageSource;
+   var renderedHtml = driver.PageSource;
         var debugPath = IOPath.Combine(_downloadFolder, "debug_rendered_page.html");
  File.WriteAllText(debugPath, renderedHtml);
 
@@ -508,12 +531,12 @@ var htmlDoc = new HtmlDocument();
 htmlDoc.LoadHtml(renderedHtml);
   var baseUri = new Uri(url);
 
-   // Parse rendered HTML with all methods
+ // Parse rendered HTML with all methods
     var imgNodes = htmlDoc.DocumentNode.SelectNodes("//img");
    if (imgNodes != null)
     {
      foreach (var img in imgNodes)
-     {
+    {
   if (cancellationToken.IsCancellationRequested) break;
 
      string[] possibleAttributes = { "src", "data-src", "data-lazy-src", "data-original", "data-file" };
@@ -546,32 +569,32 @@ htmlDoc.LoadHtml(renderedHtml);
   {
  var lower = href.ToLowerInvariant();
          if (lower.EndsWith(".jpg") || lower.EndsWith(".jpeg") || 
-       lower.EndsWith(".png") || lower.EndsWith(".gif") || 
+  lower.EndsWith(".png") || lower.EndsWith(".gif") || 
   lower.EndsWith(".webp"))
 {
  if (Uri.TryCreate(baseUri, href, out Uri? absoluteUri))
     {
   imageUrls.Add(absoluteUri.ToString());
    }
-     }
-          }
+  }
+       }
       }
    catch { /* Skip invalid elements */ }
   }
          }
-          catch { /* Continue if Selenium fails */ }
+      catch { /* Continue if Selenium fails */ }
 
-          // Regex scan of rendered HTML
+   // Regex scan of rendered HTML
     var imageUrlPattern = @"https?://[^\s""'<>\\]+?\.(?:jpg|jpeg|png|gif|webp|bmp)(?:\?[^\s""'<>\\]*)?";
 var matches = Regex.Matches(renderedHtml, imageUrlPattern, RegexOptions.IgnoreCase);
 
        foreach (Match match in matches)
   {
-     if (cancellationToken.IsCancellationRequested) break;
+  if (cancellationToken.IsCancellationRequested) break;
 
-         var imageUrl = match.Value;
+      var imageUrl = match.Value;
 if (Uri.TryCreate(imageUrl, UriKind.Absolute, out Uri? uri))
-         {
+  {
  imageUrls.Add(uri.ToString());
  }
   }
@@ -579,13 +602,13 @@ if (Uri.TryCreate(imageUrl, UriKind.Absolute, out Uri? uri))
   catch (Exception ex)
    {
        StatusText.Dispatcher.Invoke(() => 
-    StatusText.Text = $"Browser error: {ex.Message}");
+ StatusText.Text = $"Browser error: {ex.Message}");
  }
-    finally
+  finally
  {
            try { driver?.Quit(); } catch { }
    try { driver?.Dispose(); } catch { }
-       }
+     }
     }, cancellationToken);
 
 return imageUrls.ToList();
