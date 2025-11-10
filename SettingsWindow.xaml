@@ -116,7 +116,7 @@ FontStyle="Italic"
 
  <!-- Scan Limit Options -->
       <GroupBox Header="Scan Limit" Margin="0,0,0,10">
-          <StackPanel Margin="10">
+  <StackPanel Margin="10">
        <CheckBox x:Name="LimitScanCheckBox" 
     Content="Limit number of images to scan"
          Margin="0,0,0,10"/>
@@ -125,9 +125,9 @@ FontStyle="Italic"
        <Grid.ColumnDefinitions>
      <ColumnDefinition Width="Auto"/>
     <ColumnDefinition Width="*"/>
-               <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
-        
+      
      <TextBlock Grid.Column="0" 
     Text="Maximum images:" 
   VerticalAlignment="Center"
@@ -136,26 +136,66 @@ FontStyle="Italic"
   <Slider x:Name="MaxImagesSlider"
 Grid.Column="1"
     Minimum="5"
-          Maximum="200"
-        TickFrequency="5"
-             IsSnapToTickEnabled="True"
+Maximum="200"
+     TickFrequency="5"
+    IsSnapToTickEnabled="True"
       Value="20"
           VerticalAlignment="Center"/>
    
-         <TextBlock Grid.Column="2" 
+    <TextBlock Grid.Column="2" 
            Text="{Binding ElementName=MaxImagesSlider, Path=Value, StringFormat={}{0:N0} images}"
  VerticalAlignment="Center"
-          Margin="10,0,0,0"
-             Width="80"/>
-       </Grid>
-         
+     Margin="10,0,0,0"
+          Width="80"/>
+     </Grid>
+ 
      <TextBlock Text="Duplicates are automatically skipped and scanning continues until limit is reached"
-               FontSize="10"
-       FontStyle="Italic"
+FontSize="10"
+     FontStyle="Italic"
   Foreground="Gray"
     Margin="0,10,0,0"
            TextWrapping="Wrap"/>
        </StackPanel>
+    </GroupBox>
+
+ <!-- Pagination Options -->
+      <GroupBox Header="Pagination" Margin="0,0,0,10">
+          <StackPanel Margin="10">
+     <Grid>
+   <Grid.ColumnDefinitions>
+     <ColumnDefinition Width="Auto"/>
+    <ColumnDefinition Width="*"/>
+    <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        
+     <TextBlock Grid.Column="0" 
+    Text="Items per page:" 
+  VerticalAlignment="Center"
+    Margin="0,0,10,0"/>
+         
+  <Slider x:Name="ItemsPerPageSlider"
+Grid.Column="1"
+  Minimum="10"
+          Maximum="200"
+        TickFrequency="10"
+         IsSnapToTickEnabled="True"
+      Value="50"
+  VerticalAlignment="Center"/>
+ 
+         <TextBlock Grid.Column="2" 
+           Text="{Binding ElementName=ItemsPerPageSlider, Path=Value, StringFormat={}{0:N0} items}"
+ VerticalAlignment="Center"
+          Margin="10,0,0,0"
+             Width="80"/>
+  </Grid>
+         
+     <TextBlock Text="Controls how many images are shown per page in the list view"
+               FontSize="10"
+    FontStyle="Italic"
+  Foreground="Gray"
+    Margin="0,10,0,0"
+           TextWrapping="Wrap"/>
+     </StackPanel>
     </GroupBox>
     </StackPanel>
  </ScrollViewer>

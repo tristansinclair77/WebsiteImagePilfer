@@ -21,6 +21,7 @@ namespace WebsiteImagePilfer
             LimitScanCheckBox.IsChecked = _settings.LimitScanCount;
             MaxImagesSlider.Value = _settings.MaxImagesToScan;
             LoadPreviewsCheckBox.IsChecked = _settings.LoadPreviews;
+            ItemsPerPageSlider.Value = _settings.ItemsPerPage;
         }
 
         private void OkButton_Click(object sender, RoutedEventArgs e)
@@ -35,6 +36,7 @@ namespace WebsiteImagePilfer
             _settings.LimitScanCount = LimitScanCheckBox.IsChecked == true;
             _settings.MaxImagesToScan = (int)MaxImagesSlider.Value;
             _settings.LoadPreviews = LoadPreviewsCheckBox.IsChecked == true;
+            _settings.ItemsPerPage = (int)ItemsPerPageSlider.Value;
 
             // Validate file type filters
             if (_settings.FilterJpgOnly && _settings.FilterPngOnly)

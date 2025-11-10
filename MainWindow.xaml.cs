@@ -55,6 +55,9 @@ _httpClient = new HttpClient();
   
      // Load settings
    _settings = new DownloadSettings();
+        
+  // Apply items per page from settings
+      _itemsPerPage = _settings.ItemsPerPage;
 
    // Set default download folder from settings or use default
     _downloadFolder = string.IsNullOrEmpty(Properties.Settings.Default.DownloadFolder)
@@ -68,20 +71,20 @@ _httpClient = new HttpClient();
   UrlTextBox.Text = Properties.Settings.Default.LastUrl;
   }
 
-        // Set up column width monitoring
+    // Set up column width monitoring
         PreviewColumn.Width = 150; // Ensure it starts with a known width
-        _lastPreviewColumnWidth = 150;
+   _lastPreviewColumnWidth = 150;
     
-        // Setup debounce timer for column resize
-        _columnResizeTimer = new System.Timers.Timer(500); // 500ms debounce
-        _columnResizeTimer.AutoReset = false;
-      _columnResizeTimer.Elapsed += ColumnResizeTimer_Elapsed;
+    // Setup debounce timer for column resize
+      _columnResizeTimer = new System.Timers.Timer(500); // 500ms debounce
+ _columnResizeTimer.AutoReset = false;
+  _columnResizeTimer.Elapsed += ColumnResizeTimer_Elapsed;
       
         // Monitor column width changes by polling
       var columnWidthMonitor = new System.Windows.Threading.DispatcherTimer();
-        columnWidthMonitor.Interval = TimeSpan.FromMilliseconds(100); // Check every 100ms
+      columnWidthMonitor.Interval = TimeSpan.FromMilliseconds(100); // Check every 100ms
     columnWidthMonitor.Tick += (s, e) => CheckColumnWidthChanged();
-   columnWidthMonitor.Start();
+columnWidthMonitor.Start();
 }
 
         private void CheckColumnWidthChanged()
@@ -1305,11 +1308,22 @@ Verb = "open"
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
-            var settingsWindow = new SettingsWindow(_settings);
-    if (settingsWindow.ShowDialog() == true)
-            {
-  // Settings were updated, refresh if needed
-         StatusText.Text = "Settings updated.";
+ var settingsWindow = new SettingsWindow(_settings);
+  if (settingsWindow.ShowDialog() == true)
+{
+          // Settings were updated
+
+  // Apply items per page if it changed
+ if (_itemsPerPage != _settings.ItemsPerPage)
+      {
+   _itemsPerPage = _settings.ItemsPerPage;
+  
+    // Reset to page 1 and update pagination
+      _currentPage = 1;
+        UpdatePagination();
+        }
+     
+     StatusText.Text = "Settings updated.";
     }
         }
 
@@ -1594,7 +1608,8 @@ public string Status
  public bool SkipFullResolutionCheck { get; set; } = false;
    public bool LimitScanCount { get; set; } = false;
      public int MaxImagesToScan { get; set; } = 20; // Default: scan 20 images
-        public bool LoadPreviews { get; set; } = true; // Load preview images during scan
+     public bool LoadPreviews { get; set; } = true; // Load preview images during scan
+        public int ItemsPerPage { get; set; } = 50; // Items per page in pagination
   }
 
     // Converter to get the index of a ListView item
