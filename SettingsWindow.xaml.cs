@@ -16,28 +16,30 @@ namespace WebsiteImagePilfer
    MinSizeSlider.Value = _settings.MinimumImageSize;
       ShowThumbnailsCheckBox.IsChecked = _settings.ShowThumbnails;
       FilterJpgCheckBox.IsChecked = _settings.FilterJpgOnly;
-            FilterPngCheckBox.IsChecked = _settings.FilterPngOnly;
-        }
+  FilterPngCheckBox.IsChecked = _settings.FilterPngOnly;
+            SkipFullResCheckBox.IsChecked = _settings.SkipFullResolutionCheck;
+ }
 
  private void OkButton_Click(object sender, RoutedEventArgs e)
         {
       // Save settings
   _settings.FilterBySize = FilterBySizeCheckBox.IsChecked == true;
             _settings.MinimumImageSize = (int)MinSizeSlider.Value;
-            _settings.ShowThumbnails = ShowThumbnailsCheckBox.IsChecked == true;
-          _settings.FilterJpgOnly = FilterJpgCheckBox.IsChecked == true;
+    _settings.ShowThumbnails = ShowThumbnailsCheckBox.IsChecked == true;
+       _settings.FilterJpgOnly = FilterJpgCheckBox.IsChecked == true;
   _settings.FilterPngOnly = FilterPngCheckBox.IsChecked == true;
+            _settings.SkipFullResolutionCheck = SkipFullResCheckBox.IsChecked == true;
 
-         // Validate file type filters
+     // Validate file type filters
             if (_settings.FilterJpgOnly && _settings.FilterPngOnly)
           {
     MessageBox.Show("You cannot select both JPG and PNG only filters. Please choose one or neither.", 
-     "Invalid Settings", MessageBoxButton.OK, MessageBoxImage.Warning);
-           return;
+  "Invalid Settings", MessageBoxButton.OK, MessageBoxImage.Warning);
+ return;
             }
 
             DialogResult = true;
-            Close();
+      Close();
         }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)

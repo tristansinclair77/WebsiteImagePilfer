@@ -81,7 +81,7 @@ Minimum="1000"
 <CheckBox x:Name="FilterPngCheckBox" 
     Content="Download PNG only"
 Margin="0,0,0,5"/>
-         <TextBlock Text="Note: Leave both unchecked to download all image types"
+      <TextBlock Text="Note: Leave both unchecked to download all image types"
        FontSize="10"
 FontStyle="Italic"
       Foreground="Gray"
@@ -89,6 +89,21 @@ FontStyle="Italic"
  TextWrapping="Wrap"/>
    </StackPanel>
     </GroupBox>
+
+      <!-- Full Resolution Options -->
+     <GroupBox Header="Full Resolution Detection" Margin="0,0,0,10">
+          <StackPanel Margin="10">
+            <CheckBox x:Name="SkipFullResCheckBox" 
+         Content="Skip full-resolution check (faster, download previews only)"
+     Margin="0,0,0,5"/>
+        <TextBlock Text="When unchecked: App will try to find and download full-resolution images instead of previews/thumbnails"
+          FontSize="10"
+   FontStyle="Italic"
+ Foreground="Gray"
+   Margin="0,5,0,0"
+           TextWrapping="Wrap"/>
+             </StackPanel>
+          </GroupBox>
     </StackPanel>
  </ScrollViewer>
 

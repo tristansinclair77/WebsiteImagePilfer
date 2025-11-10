@@ -18,6 +18,7 @@ using System.ComponentModel;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
+using System.Web;
 
 namespace WebsiteImagePilfer
 {
@@ -117,21 +118,41 @@ StatusText.Text = "Scan cancelled.";
         foreach (var imageUrl in _scannedImageUrls)
        {
            var uri = new Uri(imageUrl);
-   var fileName = IOPath.GetFileName(uri.LocalPath);
-   if (string.IsNullOrEmpty(fileName) || !IOPath.HasExtension(fileName))
-  {
-       fileName = $"image_{_imageItems.Count + 1}.jpg";
-      }
-          fileName = SanitizeFileName(fileName);
+           var fileName = "";
 
-  var item = new ImageDownloadItem
+  // KEMONO.CR: Check for ?f= query parameter (contains actual filename)
+  if (uri.Query.Contains("?f=") || uri.Query.Contains("&f="))
+           {
+          var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
+         var fParam = queryParams["f"];
+      if (!string.IsNullOrEmpty(fParam))
+          {
+fileName = fParam;
+  }
+    }
+
+           // Fallback to path filename if no query parameter
+     if (string.IsNullOrEmpty(fileName))
+       {
+  fileName = IOPath.GetFileName(uri.LocalPath);
+    }
+
+           // Final fallback if still empty
+ if (string.IsNullOrEmpty(fileName) || !IOPath.HasExtension(fileName))
   {
-  Url = imageUrl,
-     Status = "Ready",
-    FileName = fileName
-    };
-_imageItems.Add(item);
-      }
+               fileName = $"image_{_imageItems.Count + 1}.jpg";
+           }
+
+      fileName = SanitizeFileName(fileName);
+
+           var item = new ImageDownloadItem
+      {
+          Url = imageUrl,
+    Status = "Ready",
+   FileName = fileName
+      };
+       _imageItems.Add(item);
+     }
 
         string scanType = useFastScan ? "Fast" : "Thorough";
           StatusText.Text = $"Found {_scannedImageUrls.Count} images ({scanType} scan). Click 'Download' to save them.";
@@ -298,94 +319,166 @@ Directory.CreateDirectory(_downloadFolder);
         private async Task DownloadSingleItemAsync(ImageDownloadItem item, CancellationToken cancellationToken)
         {
     try
-            {
-     item.Status = "Checking...";
+ {
+  item.Status = "Checking...";
+ var startTime = DateTime.Now;
 
-   // Get the image filename from URL
-    var uri = new Uri(item.Url);
-                var fileName = item.FileName;
+      string urlToDownload = item.Url;
+       bool usedBackup = false;
 
-                // Sanitize filename if not already done
-    if (string.IsNullOrEmpty(fileName) || fileName.Contains("image_"))
-        {
-              fileName = IOPath.GetFileName(uri.LocalPath);
-        if (string.IsNullOrEmpty(fileName) || !IOPath.HasExtension(fileName))
-           {
-            fileName = $"image_{DateTime.Now:yyyyMMddHHmmss}_{Guid.NewGuid().ToString().Substring(0, 8)}.jpg";
+  // Try to find full-resolution version if setting allows
+      if (!_settings.SkipFullResolutionCheck)
+   {
+ try
+   {
+  item.Status = "Finding full-res...";
+          var fullResStart = DateTime.Now;
+     var fullResUrl = await TryFindFullResolutionUrlAsync(item.Url, cancellationToken);
+     var fullResElapsed = (DateTime.Now - fullResStart).TotalMilliseconds;
+  
+        // LOG: Full-res check timing
+        StatusText.Dispatcher.Invoke(() => 
+        StatusText.Text = $"Full-res check took {fullResElapsed}ms for {item.FileName}");
+     
+  if (fullResUrl != null)
+    {
+ urlToDownload = fullResUrl;
+  }
+   else
+  {
+    usedBackup = true;
+  }
+ }
+  catch (Exception ex)
+  {
+   // LOG: Full-res check error
+     StatusText.Dispatcher.Invoke(() => 
+  StatusText.Text = $"Full-res check failed: {ex.Message}");
+    usedBackup = true;
+   }
+ }
+
+ // USE THE FILENAME WE ALREADY HAVE from the scan!
+          // Don't re-extract it from the URL
+   var fileName = item.FileName;
+     
+         // Only generate a new filename if we don't have one yet
+       if (string.IsNullOrEmpty(fileName) || fileName.StartsWith("image_"))
+   {
+       // Extract from download URL as fallback
+  var uri = new Uri(urlToDownload);
+            
+    // Check for query parameter first
+  if (uri.Query.Contains("?f=") || uri.Query.Contains("&f="))
+      {
+     var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
+  var fParam = queryParams["f"];
+    if (!string.IsNullOrEmpty(fParam))
+   {
+            fileName = fParam;
+            }
+        }
+        
+    // Fallback to path filename
+ if (string.IsNullOrEmpty(fileName))
+ {
+            fileName = IOPath.GetFileName(uri.LocalPath);
+  }
+  
+  // Final fallback
+      if (string.IsNullOrEmpty(fileName) || !IOPath.HasExtension(fileName))
+    {
+fileName = $"image_{DateTime.Now:yyyyMMddHHmmss}_{Guid.NewGuid().ToString().Substring(0, 8)}.jpg";
      }
-         fileName = SanitizeFileName(fileName);
-    item.FileName = fileName;
+   
+  fileName = SanitizeFileName(fileName);
+  item.FileName = fileName;
   }
 
-              // Check file type filters before downloading
+    // Check file type filters before downloading
       var extension = IOPath.GetExtension(fileName).ToLowerInvariant();
   if (_settings.FilterJpgOnly && extension != ".jpg" && extension != ".jpeg")
  {
-            item.Status = "⊘ Skipped (not JPG)";
+ item.Status = "⊘ Skipped (not JPG)";
         item.FileName = $"{fileName} (Filtered: {extension})";
 return;
-      }
-         if (_settings.FilterPngOnly && extension != ".png")
-      {
-     item.Status = "⊘ Skipped (not PNG)";
+   }
+       if (_settings.FilterPngOnly && extension != ".png")
+  {
+ item.Status = "⊘ Skipped (not PNG)";
         item.FileName = $"{fileName} (Filtered: {extension})";
-           return;
+      return;
      }
 
-      // Check if file already exists (DUPLICATE DETECTION)
+      // Check if file already exists - using the CORRECT filename we got from scan
   var filePath = IOPath.Combine(_downloadFolder, fileName);
      if (File.Exists(filePath))
-      {
-     item.Status = "⊘ Duplicate";
-           return;
-         }
+ {
+item.Status = "⊘ Duplicate";
+  return;
+       }
 
-           item.Status = "Downloading...";
+     item.Status = "Downloading...";
+      var downloadStart = DateTime.Now;
 
-       // Download the image
-     var imageBytes = await _httpClient.GetByteArrayAsync(item.Url, cancellationToken);
+  // Download the image
+     var imageBytes = await _httpClient.GetByteArrayAsync(urlToDownload, cancellationToken);
+    var downloadElapsed = (DateTime.Now - downloadStart).TotalMilliseconds;
 
      // Filter by size if setting is enabled
-                if (_settings.FilterBySize && imageBytes.Length < _settings.MinimumImageSize)
-            {
+ if (_settings.FilterBySize && imageBytes.Length < _settings.MinimumImageSize)
+   {
          item.Status = "⊘ Skipped (too small)";
-         item.FileName = $"{fileName} ({imageBytes.Length} bytes)";
+ item.FileName = $"{fileName} ({imageBytes.Length} bytes)";
          return;
-        }
+  }
 
-              await File.WriteAllBytesAsync(filePath, imageBytes, cancellationToken);
+    await File.WriteAllBytesAsync(filePath, imageBytes, cancellationToken);
 
     // Create thumbnail for preview
-     if (_settings.ShowThumbnails)
+ if (_settings.ShowThumbnails)
         {
-        try
-    {
-          item.ThumbnailPath = filePath;
-        }
-        catch
-          {
+try
+  {
+   item.ThumbnailPath = filePath;
+ }
+catch
+ {
      // Thumbnail generation failed, continue without it
        }
 }
 
-    item.Status = "✓ Done";
-  }
-            catch (OperationCanceledException)
-       {
-         item.Status = "⊘ Cancelled";
-   throw;
+   if (usedBackup)
+  {
+  item.Status = "✓ Backup";
     }
-            catch (HttpRequestException ex)
-      {
-            item.Status = "✗ Failed";
-   item.FileName = $"{item.FileName} - Network error: {ex.Message}";
-          }
-    catch (Exception ex)
-        {
-     item.Status = "✗ Failed";
-           item.FileName = $"{item.FileName} - {ex.Message}";
+ else
+ {
+    item.Status = "✓ Done";
+ }
+  
+    var totalElapsed = (DateTime.Now - startTime).TotalMilliseconds;
+      // LOG: Total time
+     System.Diagnostics.Debug.WriteLine($"Downloaded {fileName} in {totalElapsed}ms (download: {downloadElapsed}ms)");
   }
-        }
+       catch (OperationCanceledException)
+     {
+       item.Status = "⊘ Cancelled";
+   throw;
+ }
+     catch (HttpRequestException ex)
+      {
+       item.Status = "✗ Failed";
+   item.FileName = $"{item.FileName} - Network error: {ex.Message}";
+      System.Diagnostics.Debug.WriteLine($"HTTP error for {item.FileName}: {ex.Message}");
+    }
+    catch (Exception ex)
+  {
+item.Status = "✗ Failed";
+item.FileName = $"{item.FileName} - {ex.Message}";
+     System.Diagnostics.Debug.WriteLine($"Error for {item.FileName}: {ex.Message}");
+  }
+      }
 
         private async Task<List<string>> GetImageUrlsWithSeleniumAsync(string url, CancellationToken cancellationToken, bool useFastScan = false)
      {
@@ -536,10 +629,40 @@ htmlDoc.LoadHtml(renderedHtml);
    if (imgNodes != null)
     {
      foreach (var img in imgNodes)
-    {
+  {
   if (cancellationToken.IsCancellationRequested) break;
 
-     string[] possibleAttributes = { "src", "data-src", "data-lazy-src", "data-original", "data-file" };
+            // PRIORITY: Check if image is wrapped in a link to full-resolution
+      var parentLink = img.ParentNode;
+    string? fullResUrl = null;
+ 
+            if (parentLink != null && parentLink.Name == "a")
+  {
+         var href = parentLink.GetAttributeValue("href", "");
+     if (!string.IsNullOrEmpty(href))
+        {
+      var lower = href.ToLowerInvariant();
+ if (lower.Contains(".jpg") || lower.Contains(".jpeg") || 
+       lower.Contains(".png") || lower.Contains(".gif") || 
+        lower.Contains(".webp") || lower.Contains(".bmp"))
+ {
+   if (Uri.TryCreate(baseUri, href, out Uri? absoluteUri))
+  {
+fullResUrl = absoluteUri.ToString();
+           }
+     }
+  }
+       }
+
+          // If we found a full-res link, use that instead of img src
+   if (fullResUrl != null)
+      {
+ imageUrls.Add(fullResUrl);
+     continue; // Skip checking img attributes
+            }
+
+    // Otherwise check img attributes
+  string[] possibleAttributes = { "src", "data-src", "data-lazy-src", "data-original", "data-file" };
   foreach (var attr in possibleAttributes)
        {
     var src = img.GetAttributeValue(attr, "");
@@ -548,10 +671,11 @@ htmlDoc.LoadHtml(renderedHtml);
      if (Uri.TryCreate(baseUri, src, out Uri? absoluteUri))
    {
       imageUrls.Add(absoluteUri.ToString());
+      break; // Only add one URL per image
    }
   }
  }
-         }
+    }
     }
 
    // Find direct image links
@@ -678,11 +802,100 @@ return imageUrls.ToList();
  if (sanitized.Length > 200)
      {
              var extension = IOPath.GetExtension(sanitized);
-                sanitized = sanitized.Substring(0, 200 - extension.Length) + extension;
+      sanitized = sanitized.Substring(0, 200 - extension.Length) + extension;
     }
  
-            return sanitized;
+     return sanitized;
       }
+
+        private async Task<string?> TryFindFullResolutionUrlAsync(string previewUrl, CancellationToken cancellationToken)
+        {
+  try
+   {
+  // KEMONO.CR SPECIFIC PATTERN - NO HEAD REQUEST NEEDED
+      // Preview: https://img.kemono.cr/thumbnail/data/...
+      // Full:    https://n4.kemono.cr/data/...?f=filename
+      if (previewUrl.Contains("kemono.cr") && previewUrl.Contains("/thumbnail/"))
+   {
+  // Remove "/thumbnail/" and change subdomain from "img" to "n4"
+  var fullResUrl = previewUrl.Replace("/thumbnail/", "/").Replace("img.kemono.cr", "n4.kemono.cr");
+         System.Diagnostics.Debug.WriteLine($"Kemono.cr pattern detected, using full-res URL without HEAD check");
+       return fullResUrl; // Return directly without testing
+ }
+
+  // Pattern 1: Remove "/thumbnail/" from path (generic pattern)
+      if (previewUrl.Contains("/thumbnail/"))
+    {
+   var fullResUrl = previewUrl.Replace("/thumbnail/", "/");
+  if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
+   {
+   return fullResUrl;
+     }
+    }
+
+     // Pattern 2: Remove size suffixes
+          var sizePatterns = new[] { "_800x800", "_small", "_medium", "_thumb", "_preview", "-thumb", "-preview" };
+           foreach (var pattern in sizePatterns)
+ {
+      if (previewUrl.Contains(pattern))
+   {
+      var fullResUrl = previewUrl.Replace(pattern, "");
+   if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
+    {
+       return fullResUrl;
+ }
+         }
+ }
+
+      // Pattern 3: Replace "thumb" or "preview" with empty
+      if (previewUrl.Contains("thumb") || previewUrl.Contains("preview"))
+   {
+      var fullResUrl = previewUrl.Replace("thumb", "").Replace("preview", "");
+          if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
+              {
+  return fullResUrl;
+    }
+    }
+
+      // No full-resolution found
+return null;
+        }
+         catch (Exception ex)
+    {
+     System.Diagnostics.Debug.WriteLine($"TryFindFullResolutionUrlAsync exception: {ex.Message}");
+return null;
+ }
+  }
+
+        private async Task<bool> TestUrlExistsAsync(string url, CancellationToken cancellationToken)
+        {
+     try
+ {
+       var testStart = DateTime.Now;
+   var request = new HttpRequestMessage(HttpMethod.Head, url);
+       
+          // Add timeout for HEAD request (5 seconds max)
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+     using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+ 
+        var response = await _httpClient.SendAsync(request, linkedCts.Token);
+      var elapsed = (DateTime.Now - testStart).TotalMilliseconds;
+
+    System.Diagnostics.Debug.WriteLine($"HEAD request to {url.Substring(0, Math.Min(60, url.Length))}... took {elapsed}ms - Status: {response.StatusCode}");
+       
+    return response.IsSuccessStatusCode;
+         }
+ catch (TaskCanceledException)
+  {
+ System.Diagnostics.Debug.WriteLine($"HEAD request timed out for {url.Substring(0, Math.Min(60, url.Length))}...");
+   return false;
+   }
+  catch (Exception ex)
+ {
+    System.Diagnostics.Debug.WriteLine($"HEAD request failed for {url.Substring(0, Math.Min(60, url.Length))}...: {ex.Message}");
+     return false;
+   }
+   }
     }
 
     public class ImageDownloadItem : INotifyPropertyChanged
@@ -727,9 +940,10 @@ public string Url
     public class DownloadSettings
     {
         public bool FilterBySize { get; set; } = false;
-        public int MinimumImageSize { get; set; } = 5000; // 5KB minimum
+   public int MinimumImageSize { get; set; } = 5000; // 5KB minimum
         public bool ShowThumbnails { get; set; } = true;
         public bool FilterJpgOnly { get; set; } = false;
    public bool FilterPngOnly { get; set; } = false;
-    }
+ public bool SkipFullResolutionCheck { get; set; } = false;
+  }
 }
