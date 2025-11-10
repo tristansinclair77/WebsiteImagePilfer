@@ -13,14 +13,14 @@ xmlns:local="clr-namespace:WebsiteImagePilfer"
      <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
         <RowDefinition Height="*"/>
      <RowDefinition Height="Auto"/>
       <RowDefinition Height="Auto"/>
   </Grid.RowDefinitions>
-     
+  
       <!-- URL Input Row -->
-        <Grid Grid.Row="0" Margin="0,0,0,10">
+  <Grid Grid.Row="0" Margin="0,0,0,10">
        <Grid.ColumnDefinitions>
       <ColumnDefinition Width="*"/>
       <ColumnDefinition Width="Auto"/>
@@ -85,11 +85,11 @@ Click="CancelButton_Click"/>
         <!-- Progress Bar -->
     <ProgressBar x:Name="DownloadProgress" 
      Grid.Row="1"
-            Height="20" 
-      Margin="0,0,0,10"
+     Height="20" 
+  Margin="0,0,0,10"
          Minimum="0"
        Maximum="100"
-             Value="0"/>
+       Value="0"/>
         
         <!-- Folder Selection -->
      <Grid Grid.Row="2" Margin="0,0,0,10">
@@ -138,10 +138,10 @@ IsReadOnly="True"/>
     Height="25"
          Click="SettingsButton_Click"/>
 </Grid>
-        
+      
    <!-- Image List -->
         <ListView x:Name="ImageList" 
-     Grid.Row="3"
+   Grid.Row="3"
      Margin="0,0,0,10"
     SelectionMode="Extended"
     SelectionChanged="ImageList_SelectionChanged"
@@ -149,7 +149,7 @@ IsReadOnly="True"/>
    <ListView.View>
      <GridView>
  <GridViewColumn Header="#" Width="40">
-    <GridViewColumn.CellTemplate>
+  <GridViewColumn.CellTemplate>
        <DataTemplate>
         <TextBlock Text="{Binding RelativeSource={RelativeSource AncestorType=ListViewItem}, 
        Converter={StaticResource IndexConverter}}"
@@ -157,14 +157,18 @@ IsReadOnly="True"/>
            </DataTemplate>
     </GridViewColumn.CellTemplate>
       </GridViewColumn>
-       <GridViewColumn Header="Preview" Width="80">
-        <GridViewColumn.CellTemplate>
+       <GridViewColumn x:Name="PreviewColumn" Header="Preview" Width="150">
+   <GridViewColumn.CellTemplate>
     <DataTemplate>
  <Image Source="{Binding PreviewImage}" 
-  Width="60" 
-     Height="60" 
-   Stretch="Uniform"
-  Margin="2"/>
+  MaxWidth="{Binding Path=ActualWidth, RelativeSource={RelativeSource AncestorType=GridViewColumn}}" 
+ Stretch="Uniform"
+  Margin="2"
+  HorizontalAlignment="Center"
+  VerticalAlignment="Center"
+        RenderOptions.BitmapScalingMode="Fant"
+            UseLayoutRounding="True"
+SnapsToDevicePixels="True"/>
   </DataTemplate>
  </GridViewColumn.CellTemplate>
      </GridViewColumn>

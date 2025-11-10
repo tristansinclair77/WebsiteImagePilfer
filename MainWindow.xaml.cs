@@ -29,19 +29,21 @@ namespace WebsiteImagePilfer
     /// </summary>
     public partial class MainWindow : Window
     {
-     private readonly HttpClient _httpClient;
+ private readonly HttpClient _httpClient;
  private ObservableCollection<ImageDownloadItem> _imageItems;
         private ObservableCollection<ImageDownloadItem> _currentPageItems; // Items for current page
  private string _downloadFolder;
    private CancellationTokenSource? _cancellationTokenSource;
  private DownloadSettings _settings;
   private List<string> _scannedImageUrls; // Store scanned URLs
-        public int _currentPage = 1; // Public for converter access
-        public int _itemsPerPage = 50; // Public for converter access
+      public int _currentPage = 1; // Public for converter access
+     public int _itemsPerPage = 50; // Public for converter access
       private int _totalPages = 1;
+   private double _lastPreviewColumnWidth = 0; // Track last column width for reload
+      private System.Timers.Timer? _columnResizeTimer; // Debounce timer for column resize
 
    public MainWindow()
-     {
+  {
  InitializeComponent();
 _httpClient = new HttpClient();
     _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
@@ -50,9 +52,9 @@ _httpClient = new HttpClient();
       _currentPageItems = new ObservableCollection<ImageDownloadItem>();
  ImageList.ItemsSource = _currentPageItems; // Bind to current page items
     _scannedImageUrls = new List<string>();
-          
+  
      // Load settings
-            _settings = new DownloadSettings();
+   _settings = new DownloadSettings();
 
    // Set default download folder from settings or use default
     _downloadFolder = string.IsNullOrEmpty(Properties.Settings.Default.DownloadFolder)
@@ -60,14 +62,86 @@ _httpClient = new HttpClient();
  : Properties.Settings.Default.DownloadFolder;
   FolderTextBox.Text = _downloadFolder;
     
-        // Load last URL if available
-      if (!string.IsNullOrEmpty(Properties.Settings.Default.LastUrl))
-            {
+// Load last URL if available
+  if (!string.IsNullOrEmpty(Properties.Settings.Default.LastUrl))
+       {
   UrlTextBox.Text = Properties.Settings.Default.LastUrl;
   }
+
+        // Set up column width monitoring
+        PreviewColumn.Width = 150; // Ensure it starts with a known width
+        _lastPreviewColumnWidth = 150;
+    
+        // Setup debounce timer for column resize
+        _columnResizeTimer = new System.Timers.Timer(500); // 500ms debounce
+        _columnResizeTimer.AutoReset = false;
+      _columnResizeTimer.Elapsed += ColumnResizeTimer_Elapsed;
+      
+        // Monitor column width changes by polling
+      var columnWidthMonitor = new System.Windows.Threading.DispatcherTimer();
+        columnWidthMonitor.Interval = TimeSpan.FromMilliseconds(100); // Check every 100ms
+    columnWidthMonitor.Tick += (s, e) => CheckColumnWidthChanged();
+   columnWidthMonitor.Start();
 }
 
-   private async void ScanOnlyButton_Click(object sender, RoutedEventArgs e)
+        private void CheckColumnWidthChanged()
+        {
+   // Check if preview column width has changed significantly
+   if (PreviewColumn.ActualWidth > 0)
+            {
+    double widthDifference = Math.Abs(PreviewColumn.ActualWidth - _lastPreviewColumnWidth);
+      
+ // If width changed by more than 10 pixels, reload previews
+ if (widthDifference > 10)
+      {
+ // Restart the debounce timer
+   _columnResizeTimer?.Stop();
+    _columnResizeTimer?.Start();
+    }
+        }
+   }
+
+        private async void ColumnResizeTimer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e)
+        {
+      await Dispatcher.InvokeAsync(async () =>
+ {
+       if (PreviewColumn.ActualWidth > 0 && _settings.LoadPreviews)
+  {
+    _lastPreviewColumnWidth = PreviewColumn.ActualWidth;
+      StatusText.Text = "Reloading previews at new resolution...";
+      
+    // Reload all previews in the current page with new column width
+   await ReloadAllPreviewsAsync();
+    
+ StatusText.Text = "Ready"; // Clear status when done
+    }
+  });
+        }
+
+     private async Task ReloadAllPreviewsAsync()
+        {
+            // Get all items that have preview images loaded
+   var itemsWithPreviews = _imageItems.Where(i => !string.IsNullOrEmpty(i.Url) && _settings.LoadPreviews).ToList();
+    
+      foreach (var item in itemsWithPreviews)
+            {
+                try
+{
+               // Reload the preview at the new column width
+    var newPreview = await LoadPreviewImageAsync(item.Url);
+if (newPreview != null)
+     {
+              item.PreviewImage = newPreview;
+         }
+    }
+      catch (Exception ex)
+     {
+    System.Diagnostics.Debug.WriteLine($"Failed to reload preview for {item.Url}: {ex.Message}");
+    }
+            }
+        }
+
+        private async void ScanOnlyButton_Click(object sender, RoutedEventArgs e)
  {
       string url = UrlTextBox.Text.Trim();
           
@@ -80,15 +154,15 @@ _httpClient = new HttpClient();
 
     if (!Uri.IsWellFormedUriString(url, UriKind.Absolute))
       {
-           MessageBox.Show("Please enter a valid URL (including http:// or https://).", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+        MessageBox.Show("Please enter a valid URL (including http:// or https://).", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
       return;
             }
 
-            // Save last URL
+   // Save last URL
         Properties.Settings.Default.LastUrl = url;
    Properties.Settings.Default.Save();
 
-            // Setup cancellation token
+    // Setup cancellation token
     _cancellationTokenSource = new CancellationTokenSource();
 
    // Update UI state
@@ -112,13 +186,13 @@ _httpClient = new HttpClient();
  {
 StatusText.Text = "Scan cancelled.";
  return;
-          }
+    }
 
          if (_scannedImageUrls.Count == 0)
-         {
+       {
        MessageBox.Show("No images found on the webpage.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
-        StatusText.Text = "No images found.";
-           return;
+    StatusText.Text = "No images found.";
+       return;
      }
 
  // Display found images in list (without downloading)
@@ -140,7 +214,7 @@ fileName = fParam;
 
      // Fallback to path filename if no query parameter
      if (string.IsNullOrEmpty(fileName))
-       {
+   {
   fileName = IOPath.GetFileName(uri.LocalPath);
     }
 
@@ -156,7 +230,7 @@ fileName = fParam;
   var filePath = IOPath.Combine(_downloadFolder, fileName);
      if (_settings.LimitScanCount && File.Exists(filePath))
       {
-     // Skip duplicate, continue to next image
+// Skip duplicate, continue to next image
        continue;
         }
 
@@ -166,21 +240,14 @@ fileName = fParam;
     Status = "Ready",
    FileName = fileName
       };
-       _imageItems.Add(item);
+     _imageItems.Add(item);
 
-            // Load preview image asynchronously if enabled (don't wait, let it load in background)
-if (_settings.LoadPreviews)
-     {
-  _ = Task.Run(async () =>
- {
-     var preview = await LoadPreviewImageAsync(imageUrl);
-       if (preview != null)
-     {
-       // Update UI on dispatcher thread
-      Dispatcher.Invoke(() => item.PreviewImage = preview);
-          }
-   });
-   }
+      // Load preview image asynchronously if enabled
+         if (_settings.LoadPreviews)
+        {
+ // Start loading preview immediately (fire and forget)
+        _ = LoadAndSetPreviewAsync(item);
+        }
 
   // Check if we've reached the scan limit
     if (_settings.LimitScanCount && _imageItems.Count >= _settings.MaxImagesToScan)
@@ -189,12 +256,12 @@ break; // Stop adding more images
   }
      }
 
-        string scanType = useFastScan ? "Fast" : "Thorough";
+    string scanType = useFastScan ? "Fast" : "Thorough";
  string limitInfo = _settings.LimitScanCount ? $" (limited to {_settings.MaxImagesToScan})" : "";
  
-            // Reset to page 1 and update pagination
+   // Reset to page 1 and update pagination
   _currentPage = 1;
-   UpdatePagination();
+ UpdatePagination();
   
      StatusText.Text = $"Found {_imageItems.Count} images{limitInfo} ({scanType} scan). Click 'Download' to save them.";
     DownloadButton.IsEnabled = true;
@@ -215,8 +282,8 @@ break; // Stop adding more images
     StatusText.Text = "Error occurred during scan.";
     }
       finally
-        {
-             ScanOnlyButton.IsEnabled = true;
+      {
+       ScanOnlyButton.IsEnabled = true;
         FastScanCheckBox.IsEnabled = true;
         CancelButton.IsEnabled = false;
  _cancellationTokenSource?.Dispose();
@@ -224,7 +291,25 @@ break; // Stop adding more images
     }
         }
 
-   private async void DownloadButton_Click(object sender, RoutedEventArgs e)
+        private async Task LoadAndSetPreviewAsync(ImageDownloadItem item)
+        {
+   try
+          {
+   var preview = await LoadPreviewImageAsync(item.Url);
+                if (preview != null)
+     {
+        // Update UI on dispatcher thread
+          await Dispatcher.InvokeAsync(() => item.PreviewImage = preview);
+       }
+    }
+            catch (Exception ex)
+  {
+         // Log error but don't fail
+ System.Diagnostics.Debug.WriteLine($"Failed to load preview for {item.Url}: {ex.Message}");
+        }
+        }
+
+        private async void DownloadButton_Click(object sender, RoutedEventArgs e)
       {
   if (_imageItems.Count == 0)
        {
@@ -1200,8 +1285,8 @@ Directory.Delete(newFolderPath);
         }
 
         private string SanitizeFileName(string fileName)
-        {
-   // Remove invalid path characters
+   {
+ // Remove invalid path characters
  var invalidChars = IOPath.GetInvalidFileNameChars();
     var sanitized = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
      
@@ -1218,27 +1303,50 @@ Directory.Delete(newFolderPath);
         private async Task<BitmapImage?> LoadPreviewImageAsync(string imageUrl)
  {
  try
-            {
-                // Download image data
-            var imageBytes = await _httpClient.GetByteArrayAsync(imageUrl);
+    {
+   // Download image data
+  var imageBytes = await _httpClient.GetByteArrayAsync(imageUrl);
       
-           // Create BitmapImage from bytes
-     var bitmap = new BitmapImage();
-        using (var stream = new MemoryStream(imageBytes))
-         {
-   bitmap.BeginInit();
-             bitmap.CacheOption = BitmapCacheOption.OnLoad;
-              bitmap.StreamSource = stream;
-         bitmap.DecodePixelWidth = 60; // Thumbnail size
-  bitmap.EndInit();
-                    bitmap.Freeze(); // Make it cross-thread accessible
+ // Get the current preview column width and DPI scale
+         double columnWidth = 120; // Default
+     double dpiScale = 1.0;
+ await Dispatcher.InvokeAsync(() =>
+      {
+       if (PreviewColumn.ActualWidth > 0)
+      {
+     columnWidth = PreviewColumn.ActualWidth;
     }
-         
+       
+  // Get DPI scaling factor for high-DPI displays
+      var source = PresentationSource.FromVisual(this);
+     if (source?.CompositionTarget != null)
+       {
+ dpiScale = source.CompositionTarget.TransformToDevice.M11;
+         }
+   });
+
+        // Calculate decode width with DPI scaling
+// Multiply by 2 for extra quality, and by DPI scale for high-DPI displays
+   int decodeWidth = (int)Math.Max(200, (columnWidth - 4) * dpiScale * 2);
+
+        // Create BitmapImage from bytes
+         var bitmap = new BitmapImage();
+     using (var stream = new MemoryStream(imageBytes))
+    {
+   bitmap.BeginInit();
+    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+           bitmap.StreamSource = stream;
+ bitmap.DecodePixelWidth = decodeWidth; // High quality decode
+  bitmap.EndInit();
+           bitmap.Freeze(); // Make it cross-thread accessible
+    }
+
      return bitmap;
-            }
-     catch
+  }
+     catch (Exception ex)
        {
     // If preview fails, return null (will show no preview)
+ System.Diagnostics.Debug.WriteLine($"Preview load failed for {imageUrl}: {ex.Message}");
        return null;
          }
         }
