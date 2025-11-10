@@ -19,6 +19,7 @@ using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
 using System.Web;
+using System.Globalization;
 
 namespace WebsiteImagePilfer
 {
@@ -116,17 +117,17 @@ StatusText.Text = "Scan cancelled.";
 
  // Display found images in list (without downloading)
         foreach (var imageUrl in _scannedImageUrls)
-       {
-           var uri = new Uri(imageUrl);
-           var fileName = "";
+     {
+      var uri = new Uri(imageUrl);
+    var fileName = "";
 
   // KEMONO.CR: Check for ?f= query parameter (contains actual filename)
   if (uri.Query.Contains("?f=") || uri.Query.Contains("&f="))
-           {
+      {
           var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
          var fParam = queryParams["f"];
       if (!string.IsNullOrEmpty(fParam))
-          {
+        {
 fileName = fParam;
   }
     }
@@ -137,28 +138,47 @@ fileName = fParam;
   fileName = IOPath.GetFileName(uri.LocalPath);
     }
 
-           // Final fallback if still empty
+         // Final fallback if still empty
  if (string.IsNullOrEmpty(fileName) || !IOPath.HasExtension(fileName))
   {
-               fileName = $"image_{_imageItems.Count + 1}.jpg";
-           }
+ fileName = $"image_{_imageItems.Count + 1}.jpg";
+   }
 
       fileName = SanitizeFileName(fileName);
 
-           var item = new ImageDownloadItem
+            // Check for duplicates - if limit is enabled and this is a duplicate, skip it
+  var filePath = IOPath.Combine(_downloadFolder, fileName);
+     if (_settings.LimitScanCount && File.Exists(filePath))
       {
+     // Skip duplicate, continue to next image
+       continue;
+            }
+
+       var item = new ImageDownloadItem
+    {
           Url = imageUrl,
     Status = "Ready",
    FileName = fileName
       };
        _imageItems.Add(item);
+
+  // Check if we've reached the scan limit
+    if (_settings.LimitScanCount && _imageItems.Count >= _settings.MaxImagesToScan)
+      {
+        break; // Stop adding more images
+  }
      }
 
         string scanType = useFastScan ? "Fast" : "Thorough";
-          StatusText.Text = $"Found {_scannedImageUrls.Count} images ({scanType} scan). Click 'Download' to save them.";
+      string limitInfo = _settings.LimitScanCount ? $" (limited to {_settings.MaxImagesToScan})" : "";
+     StatusText.Text = $"Found {_imageItems.Count} images{limitInfo} ({scanType} scan). Click 'Download' to save them.";
     DownloadButton.IsEnabled = true;
- MessageBox.Show($"Found {_scannedImageUrls.Count} images using {scanType} scan!\n\nReview the list and click 'Download' when ready.", 
-  "Scan Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+ 
+   string scanMessage = _settings.LimitScanCount 
+     ? $"Found {_imageItems.Count} images (limited to {_settings.MaxImagesToScan}) using {scanType} scan!\n\nDuplicates were automatically skipped.\n\nReview the list and click 'Download' when ready."
+     : $"Found {_imageItems.Count} images using {scanType} scan!\n\nReview the list and click 'Download' when ready.";
+ 
+   MessageBox.Show(scanMessage, "Scan Complete", MessageBoxButton.OK, MessageBoxImage.Information);
     }
  catch (OperationCanceledException)
       {
@@ -1141,5 +1161,41 @@ public string Url
         public bool FilterJpgOnly { get; set; } = false;
    public bool FilterPngOnly { get; set; } = false;
  public bool SkipFullResolutionCheck { get; set; } = false;
+   public bool LimitScanCount { get; set; } = false;
+     public int MaxImagesToScan { get; set; } = 20; // Default: scan 20 images
   }
+
+    // Converter to get the index of a ListView item
+    public class ListViewIndexConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            if (value is ListViewItem listViewItem)
+ {
+   var listView = FindParent<ListView>(listViewItem);
+  if (listView != null)
+    {
+          int index = listView.ItemContainerGenerator.IndexFromContainer(listViewItem);
+    return (index + 1).ToString(); // 1-based index
+       }
+    }
+  return "?";
+  }
+
+ public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+  throw new NotImplementedException();
+ }
+
+    private static T? FindParent<T>(DependencyObject child) where T : DependencyObject
+    {
+   DependencyObject parentObject = VisualTreeHelper.GetParent(child);
+  if (parentObject == null) return null;
+
+          if (parentObject is T parent)
+  return parent;
+       else
+   return FindParent<T>(parentObject);
+   }
+    }
 }

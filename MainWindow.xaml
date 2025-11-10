@@ -4,8 +4,11 @@
      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 xmlns:local="clr-namespace:WebsiteImagePilfer"
-        mc:Ignorable="d"
-        Title="Website Image Pilfer" Height="600" Width="900">
+      mc:Ignorable="d"
+     Title="Website Image Pilfer" Height="600" Width="900">
+  <Window.Resources>
+   <local:ListViewIndexConverter x:Key="IndexConverter"/>
+    </Window.Resources>
   <Grid Margin="10">
      <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>
@@ -130,23 +133,32 @@ IsReadOnly="True"/>
   MouseDoubleClick="ImageList_MouseDoubleClick">
    <ListView.View>
      <GridView>
-         <GridViewColumn Header="Preview" Width="80">
+ <GridViewColumn Header="#" Width="40">
+         <GridViewColumn.CellTemplate>
+          <DataTemplate>
+        <TextBlock Text="{Binding RelativeSource={RelativeSource AncestorType=ListViewItem}, 
+       Converter={StaticResource IndexConverter}}"
+              HorizontalAlignment="Center"/>
+           </DataTemplate>
+                </GridViewColumn.CellTemplate>
+      </GridViewColumn>
+       <GridViewColumn Header="Preview" Width="80">
         <GridViewColumn.CellTemplate>
     <DataTemplate>
  <Image Source="{Binding ThumbnailPath}" 
-      Width="60" 
-          Height="60" 
+  Width="60" 
+       Height="60" 
      Stretch="Uniform"
-     Margin="2"/>
-          </DataTemplate>
-            </GridViewColumn.CellTemplate>
+  Margin="2"/>
+     </DataTemplate>
+ </GridViewColumn.CellTemplate>
      </GridViewColumn>
         <GridViewColumn Header="Status" Width="80">
-        <GridViewColumn.CellTemplate>
+     <GridViewColumn.CellTemplate>
     <DataTemplate>
     <TextBlock Text="{Binding Status}"/>
   </DataTemplate>
-          </GridViewColumn.CellTemplate>
+        </GridViewColumn.CellTemplate>
        </GridViewColumn>
      <GridViewColumn Header="Image URL" Width="320">
   <GridViewColumn.CellTemplate>
@@ -155,25 +167,25 @@ IsReadOnly="True"/>
  </DataTemplate>
  </GridViewColumn.CellTemplate>
            </GridViewColumn>
-      <GridViewColumn Header="Filename" Width="150">
+    <GridViewColumn Header="Filename" Width="150">
      <GridViewColumn.CellTemplate>
    <DataTemplate>
-      <TextBlock Text="{Binding FileName}"/>
+<TextBlock Text="{Binding FileName}"/>
    </DataTemplate>
   </GridViewColumn.CellTemplate>
       </GridViewColumn>
       <GridViewColumn Header="Error" Width="280">
             <GridViewColumn.CellTemplate>
             <DataTemplate>
-          <TextBlock Text="{Binding ErrorMessage}" 
+        <TextBlock Text="{Binding ErrorMessage}" 
    Foreground="Red"
 TextTrimming="CharacterEllipsis" 
     ToolTip="{Binding ErrorMessage}"/>
-      </DataTemplate>
+    </DataTemplate>
     </GridViewColumn.CellTemplate>
      </GridViewColumn>
-          </GridView>
-        </ListView.View>
+      </GridView>
+     </ListView.View>
         </ListView>
         
      <!-- Status Bar -->
