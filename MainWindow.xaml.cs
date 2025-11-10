@@ -1111,11 +1111,11 @@ return imageUrls.ToList();
    private void NewFolderButton_Click(object sender, RoutedEventArgs e)
    {
             try
-            {
-          // Get the parent directory to create the new folder in
+    {
+// Get the parent directory to create the new folder in
    string parentDir = _downloadFolder;
     if (!Directory.Exists(parentDir))
-        {
+  {
         parentDir = IOPath.GetDirectoryName(parentDir) ?? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
      }
 
@@ -1124,19 +1124,19 @@ return imageUrls.ToList();
       string newFolderPath = IOPath.Combine(parentDir, newFolderName);
                 
     // Handle duplicates
-            int counter = 1;
+     int counter = 1;
      while (Directory.Exists(newFolderPath))
-                {
+{
   newFolderName = $"New Folder ({counter})";
   newFolderPath = IOPath.Combine(parentDir, newFolderName);
        counter++;
-                }
+        }
 
-                // Create the folder
-     Directory.CreateDirectory(newFolderPath);
+        // Create the folder
+   Directory.CreateDirectory(newFolderPath);
 
  // Prompt user to rename
-         var inputDialog = new Window
+   var inputDialog = new Window
            {
   Title = "Name New Folder",
        Width = 400,
@@ -1147,10 +1147,10 @@ return imageUrls.ToList();
    };
 
       var grid = new Grid { Margin = new Thickness(15) };
-      grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-       grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+    grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+ grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
    grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-     grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+   grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
      var label = new TextBlock 
       { 
@@ -1168,36 +1168,36 @@ return imageUrls.ToList();
  Padding = new Thickness(5),
    Margin = new Thickness(0, 0, 0, 10)
     };
-     textBox.SelectAll();
-     Grid.SetRow(textBox, 1);
+textBox.SelectAll();
+   Grid.SetRow(textBox, 1);
 
             // Add spacing row
             Grid.SetRow(new FrameworkElement(), 2);
 
        var buttonPanel = new StackPanel 
          { 
-         Orientation = Orientation.Horizontal, 
+ Orientation = Orientation.Horizontal, 
      HorizontalAlignment = HorizontalAlignment.Right,
   Margin = new Thickness(0, 10, 0, 0)
           };
-         Grid.SetRow(buttonPanel, 3);
+       Grid.SetRow(buttonPanel, 3);
 
-    var okButton = new Button 
-         { 
+var okButton = new Button 
+ { 
          Content = "OK", 
-           Width = 80, 
+Width = 80, 
   Height = 30, 
           Margin = new Thickness(0, 0, 10, 0),
-         IsDefault = true
-      };
+   IsDefault = true
+  };
    okButton.Click += (s, args) => { inputDialog.DialogResult = true; inputDialog.Close(); };
 
     var cancelButton = new Button 
          { 
-           Content = "Cancel", 
-         Width = 80, 
+ Content = "Cancel", 
+     Width = 80, 
           Height = 30,
-         IsCancel = true
+ IsCancel = true
  };
             cancelButton.Click += (s, args) => { inputDialog.DialogResult = false; inputDialog.Close(); };
 
@@ -1205,7 +1205,7 @@ return imageUrls.ToList();
     buttonPanel.Children.Add(cancelButton);
 
     grid.Children.Add(label);
-           grid.Children.Add(textBox);
+    grid.Children.Add(textBox);
  grid.Children.Add(buttonPanel);
 
         inputDialog.Content = grid;
@@ -1215,13 +1215,13 @@ return imageUrls.ToList();
   {
  string finalName = textBox.Text.Trim();
     
-          // Validate folder name
+     // Validate folder name
     if (string.IsNullOrWhiteSpace(finalName))
-         {
+ {
   MessageBox.Show("Folder name cannot be empty.", "Invalid Name", 
-              MessageBoxButton.OK, MessageBoxImage.Warning);
+       MessageBoxButton.OK, MessageBoxImage.Warning);
              Directory.Delete(newFolderPath);
-          return;
+        return;
      }
 
      // Check for invalid characters
@@ -1230,24 +1230,24 @@ return imageUrls.ToList();
  {
          MessageBox.Show("Folder name contains invalid characters.", "Invalid Name", 
      MessageBoxButton.OK, MessageBoxImage.Warning);
-             Directory.Delete(newFolderPath);
-         return;
+    Directory.Delete(newFolderPath);
+     return;
         }
 
        // Rename folder if name changed
      if (finalName != newFolderName)
     {
-            string finalPath = IOPath.Combine(parentDir, finalName);
+      string finalPath = IOPath.Combine(parentDir, finalName);
     
      if (Directory.Exists(finalPath))
       {
-          MessageBox.Show($"A folder named '{finalName}' already exists.", "Name Conflict", 
+   MessageBox.Show($"A folder named '{finalName}' already exists.", "Name Conflict", 
    MessageBoxButton.OK, MessageBoxImage.Warning);
-       Directory.Delete(newFolderPath);
-                return;
+Directory.Delete(newFolderPath);
+       return;
   }
 
-         Directory.Move(newFolderPath, finalPath);
+    Directory.Move(newFolderPath, finalPath);
        newFolderPath = finalPath;
      }
 
@@ -1255,27 +1255,56 @@ return imageUrls.ToList();
    _downloadFolder = newFolderPath;
          FolderTextBox.Text = _downloadFolder;
 
-            // Save to settings
-      Properties.Settings.Default.DownloadFolder = _downloadFolder;
+  // Save to settings
+  Properties.Settings.Default.DownloadFolder = _downloadFolder;
     Properties.Settings.Default.Save();
 
-          StatusText.Text = $"New folder created: {finalName}";
+       StatusText.Text = $"New folder created: {finalName}";
          }
   else
-                {
+          {
    // User cancelled - delete the temporary folder
 Directory.Delete(newFolderPath);
    }
   }
        catch (Exception ex)
        {
-           MessageBox.Show($"Error creating folder: {ex.Message}", "Error", 
+ MessageBox.Show($"Error creating folder: {ex.Message}", "Error", 
       MessageBoxButton.OK, MessageBoxImage.Error);
         }
         }
 
-        private void SettingsButton_Click(object sender, RoutedEventArgs e)
+        private void OpenFolderButton_Click(object sender, RoutedEventArgs e)
         {
+        try
+   {
+   // Ensure the folder exists before trying to open it
+           if (!Directory.Exists(_downloadFolder))
+        {
+   // Try to create it
+    Directory.CreateDirectory(_downloadFolder);
+        }
+
+     // Open the folder in File Explorer
+          var processStartInfo = new System.Diagnostics.ProcessStartInfo
+    {
+           FileName = _downloadFolder,
+  UseShellExecute = true,
+Verb = "open"
+     };
+       System.Diagnostics.Process.Start(processStartInfo);
+            
+       StatusText.Text = $"Opened folder: {_downloadFolder}";
+    }
+    catch (Exception ex)
+     {
+        MessageBox.Show($"Failed to open folder: {ex.Message}", "Error Opening Folder", 
+   MessageBoxButton.OK, MessageBoxImage.Error);
+}
+        }
+
+        private void SettingsButton_Click(object sender, RoutedEventArgs e)
+    {
             var settingsWindow = new SettingsWindow(_settings);
     if (settingsWindow.ShowDialog() == true)
             {
