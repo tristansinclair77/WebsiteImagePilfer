@@ -42,85 +42,86 @@ namespace WebsiteImagePilfer
    private double _lastPreviewColumnWidth = 0; // Track last column width for reload
       private System.Timers.Timer? _columnResizeTimer; // Debounce timer for column resize
 
-   public MainWindow()
-  {
- InitializeComponent();
-_httpClient = new HttpClient();
-    _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-   _httpClient.Timeout = TimeSpan.FromSeconds(30);
-_imageItems = new ObservableCollection<ImageDownloadItem>();
-    _currentPageItems = new ObservableCollection<ImageDownloadItem>();
- ImageList.ItemsSource = _currentPageItems; // Bind to current page items
-    _scannedImageUrls = new List<string>();
-  
-     // Load settings
-   _settings = new DownloadSettings();
-        _settings.LoadFromSettings(); // Load persisted settings
-    
-  // Apply items per page from settings
-  _itemsPerPage = _settings.ItemsPerPage;
+    public MainWindow()
+    {
+        InitializeComponent();
+        _httpClient = new HttpClient();
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+        _httpClient.Timeout = TimeSpan.FromSeconds(30);
+        _imageItems = new ObservableCollection<ImageDownloadItem>();
+        _currentPageItems = new ObservableCollection<ImageDownloadItem>();
+        ImageList.ItemsSource = _currentPageItems; // Bind to current page items
+        _scannedImageUrls = new List<string>();
 
-   // Set default download folder from settings or use default
-    _downloadFolder = string.IsNullOrEmpty(Properties.Settings.Default.DownloadFolder)
-  ? IOPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "WebsiteImages")
- : Properties.Settings.Default.DownloadFolder;
-  FolderTextBox.Text = _downloadFolder;
-    
-// Load last URL if available
-  if (!string.IsNullOrEmpty(Properties.Settings.Default.LastUrl))
- {
-  UrlTextBox.Text = Properties.Settings.Default.LastUrl;
-  }
+	    // Load portable settings
+	    var appSettings = PortableSettingsManager.LoadSettings();
+	    _settings = new DownloadSettings();
+	    _settings.LoadFromPortableSettings();
 
-    // Set up column width monitoring
+        // Apply items per page from settings
+        _itemsPerPage = _settings.ItemsPerPage;
+
+        // Set default download folder from settings or use default
+        _downloadFolder = string.IsNullOrEmpty(appSettings.DownloadFolder)
+	        ? IOPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "WebsiteImages")
+	        : appSettings.DownloadFolder;
+        FolderTextBox.Text = _downloadFolder;
+
+        // Load last URL if available
+        if (!string.IsNullOrEmpty(appSettings.LastUrl))
+        {
+	        UrlTextBox.Text = appSettings.LastUrl;
+        }
+
+        // Set up column width monitoring
         PreviewColumn.Width = 150; // Ensure it starts with a known width
-   _lastPreviewColumnWidth = 150;
+        _lastPreviewColumnWidth = 150;
     
-    // Setup debounce timer for column resize
-      _columnResizeTimer = new System.Timers.Timer(500); // 500ms debounce
- _columnResizeTimer.AutoReset = false;
-  _columnResizeTimer.Elapsed += ColumnResizeTimer_Elapsed;
+        // Setup debounce timer for column resize
+        _columnResizeTimer = new System.Timers.Timer(500); // 500ms debounce
+        _columnResizeTimer.AutoReset = false;
+        _columnResizeTimer.Elapsed += ColumnResizeTimer_Elapsed;
       
         // Monitor column width changes by polling
-      var columnWidthMonitor = new System.Windows.Threading.DispatcherTimer();
-      columnWidthMonitor.Interval = TimeSpan.FromMilliseconds(100); // Check every 100ms
-    columnWidthMonitor.Tick += (s, e) => CheckColumnWidthChanged();
-columnWidthMonitor.Start();
-}
+        var columnWidthMonitor = new System.Windows.Threading.DispatcherTimer();
+        columnWidthMonitor.Interval = TimeSpan.FromMilliseconds(100); // Check every 100ms
+        columnWidthMonitor.Tick += (s, e) => CheckColumnWidthChanged();
+        columnWidthMonitor.Start();
+    }
 
-        private void CheckColumnWidthChanged()
+    private void CheckColumnWidthChanged()
+    {
+        // Check if preview column width has changed significantly
+        if (PreviewColumn.ActualWidth > 0)
         {
-   // Check if preview column width has changed significantly
-   if (PreviewColumn.ActualWidth > 0)
+            double widthDifference = Math.Abs(PreviewColumn.ActualWidth - _lastPreviewColumnWidth);
+      
+            // If width changed by more than 10 pixels, reload previews
+            if (widthDifference > 10)
             {
-    double widthDifference = Math.Abs(PreviewColumn.ActualWidth - _lastPreviewColumnWidth);
-      
- // If width changed by more than 10 pixels, reload previews
- if (widthDifference > 10)
-      {
- // Restart the debounce timer
-   _columnResizeTimer?.Stop();
-    _columnResizeTimer?.Start();
-    }
+                // Restart the debounce timer
+                _columnResizeTimer?.Stop();
+                _columnResizeTimer?.Start();
+            }
         }
-   }
+    }
 
-        private async void ColumnResizeTimer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e)
-        {
-      await Dispatcher.InvokeAsync(async () =>
- {
-       if (PreviewColumn.ActualWidth > 0 && _settings.LoadPreviews)
-  {
-    _lastPreviewColumnWidth = PreviewColumn.ActualWidth;
-      StatusText.Text = "Reloading previews at new resolution...";
+    private async void ColumnResizeTimer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    {
+        await Dispatcher.InvokeAsync(async () =>
+        {  
+            if (PreviewColumn.ActualWidth > 0 && _settings.LoadPreviews)
+            {
+                _lastPreviewColumnWidth = PreviewColumn.ActualWidth;
+                StatusText.Text = "Reloading previews at new resolution...";
       
-    // Reload all previews in the current page with new column width
-   await ReloadAllPreviewsAsync();
+                // Reload all previews in the current page with new column width
+                await ReloadAllPreviewsAsync();
     
- StatusText.Text = "Ready"; // Clear status when done
+                StatusText.Text = "Ready"; // Clear status when done
+            }
+        });
     }
-  });
-        }
 
      private async Task ReloadAllPreviewsAsync()
         {
@@ -162,12 +163,11 @@ if (newPreview != null)
       return;
             }
 
-   // Save last URL
-        Properties.Settings.Default.LastUrl = url;
-   Properties.Settings.Default.Save();
+			// Save last URL to portable settings
+			_settings.SaveToPortableSettings(_downloadFolder, url);
 
-    // Setup cancellation token
-    _cancellationTokenSource = new CancellationTokenSource();
+			// Setup cancellation token
+			_cancellationTokenSource = new CancellationTokenSource();
 
    // Update UI state
          ScanOnlyButton.IsEnabled = false;
@@ -1320,11 +1320,10 @@ return imageUrls.ToList();
        {
    _downloadFolder = dialog.FolderName;
     FolderTextBox.Text = _downloadFolder;
-   
-   // Save to settings
-        Properties.Settings.Default.DownloadFolder = _downloadFolder;
-     Properties.Settings.Default.Save();
-     }
+
+				// Save to portable settings
+				_settings.SaveToPortableSettings(_downloadFolder, UrlTextBox.Text);
+			}
         }
 
     private void UpFolderButton_Click(object sender, RoutedEventArgs e)
@@ -1339,11 +1338,10 @@ return imageUrls.ToList();
                   _downloadFolder = parentDir;
         FolderTextBox.Text = _downloadFolder;
 
-       // Save to settings
-       Properties.Settings.Default.DownloadFolder = _downloadFolder;
-      Properties.Settings.Default.Save();
+					// Save to portable settings
+					_settings.SaveToPortableSettings(_downloadFolder, UrlTextBox.Text);
 
-            StatusText.Text = $"Navigated up to: {_downloadFolder}";
+					StatusText.Text = $"Navigated up to: {_downloadFolder}";
          }
 else
          {
@@ -1505,11 +1503,10 @@ Directory.Delete(newFolderPath);
    _downloadFolder = newFolderPath;
          FolderTextBox.Text = _downloadFolder;
 
-  // Save to settings
-  Properties.Settings.Default.DownloadFolder = _downloadFolder;
-    Properties.Settings.Default.Save();
+					// Save to portable settings
+					_settings.SaveToPortableSettings(_downloadFolder, UrlTextBox.Text);
 
-       StatusText.Text = $"New folder created: {finalName}";
+					StatusText.Text = $"New folder created: {finalName}";
          }
   else
           {
@@ -1554,17 +1551,17 @@ Verb = "open"
         }
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
-    {
- var settingsWindow = new SettingsWindow(_settings);
-  if (settingsWindow.ShowDialog() == true)
-{
-     // Settings were updated and saved by the dialog
-   
-  // Save to persistent storage
-        _settings.SaveToSettings();
+        {
+            var settingsWindow = new SettingsWindow(_settings);
+            if (settingsWindow.ShowDialog() == true)
+            {
+				// Settings were updated and saved by the dialog
 
-  // Apply items per page if it changed
- if (_itemsPerPage != _settings.ItemsPerPage)
+				// Save to portable settings
+				_settings.SaveToPortableSettings(_downloadFolder, UrlTextBox.Text);
+
+				// Apply items per page if it changed
+				if (_itemsPerPage != _settings.ItemsPerPage)
       {
    _itemsPerPage = _settings.ItemsPerPage;
   
@@ -1848,53 +1845,59 @@ public string Status
         }
     }
 
-    public class DownloadSettings
-    {
-     public bool FilterBySize { get; set; } = false;
-   public int MinimumImageSize { get; set; } = 5000; // 5KB minimum
-        public bool ShowThumbnails { get; set; } = true;
-        public bool FilterJpgOnly { get; set; } = false;
-   public bool FilterPngOnly { get; set; } = false;
- public bool SkipFullResolutionCheck { get; set; } = false;
-   public bool LimitScanCount { get; set; } = false;
-     public int MaxImagesToScan { get; set; } = 20; // Default: scan 20 images
-     public bool LoadPreviews { get; set; } = true; // Load preview images during scan
-     public int ItemsPerPage { get; set; } = 50; // Items per page in pagination
+	public class DownloadSettings
+	{
+		public bool FilterBySize { get; set; } = false;
+		public int MinimumImageSize { get; set; } = 5000;
+		public bool ShowThumbnails { get; set; } = true;
+		public bool FilterJpgOnly { get; set; } = false;
+		public bool FilterPngOnly { get; set; } = false;
+		public bool SkipFullResolutionCheck { get; set; } = false;
+		public bool LimitScanCount { get; set; } = false;
+		public int MaxImagesToScan { get; set; } = 20;
+		public bool LoadPreviews { get; set; } = true;
+		public int ItemsPerPage { get; set; } = 50;
 
-     // Load settings from application settings
-        public void LoadFromSettings()
-        {
-            FilterBySize = Properties.Settings.Default.FilterBySize;
-            MinimumImageSize = Properties.Settings.Default.MinimumImageSize;
-     ShowThumbnails = Properties.Settings.Default.ShowThumbnails;
-            LoadPreviews = Properties.Settings.Default.LoadPreviews;
-FilterJpgOnly = Properties.Settings.Default.FilterJpgOnly;
-   FilterPngOnly = Properties.Settings.Default.FilterPngOnly;
-         SkipFullResolutionCheck = Properties.Settings.Default.SkipFullResolutionCheck;
- LimitScanCount = Properties.Settings.Default.LimitScanCount;
- MaxImagesToScan = Properties.Settings.Default.MaxImagesToScan;
-   ItemsPerPage = Properties.Settings.Default.ItemsPerPage;
-        }
+		// Load settings from portable JSON
+		public void LoadFromPortableSettings()
+		{
+			var appSettings = PortableSettingsManager.LoadSettings();
+			FilterBySize = appSettings.FilterBySize;
+			MinimumImageSize = appSettings.MinimumImageSize;
+			ShowThumbnails = appSettings.ShowThumbnails;
+			LoadPreviews = appSettings.LoadPreviews;
+			FilterJpgOnly = appSettings.FilterJpgOnly;
+			FilterPngOnly = appSettings.FilterPngOnly;
+			SkipFullResolutionCheck = appSettings.SkipFullResolutionCheck;
+			LimitScanCount = appSettings.LimitScanCount;
+			MaxImagesToScan = appSettings.MaxImagesToScan;
+			ItemsPerPage = appSettings.ItemsPerPage;
+		}
 
-     // Save settings to application settings
-        public void SaveToSettings()
-        {
-            Properties.Settings.Default.FilterBySize = FilterBySize;
-      Properties.Settings.Default.MinimumImageSize = MinimumImageSize;
-        Properties.Settings.Default.ShowThumbnails = ShowThumbnails;
-    Properties.Settings.Default.LoadPreviews = LoadPreviews;
-  Properties.Settings.Default.FilterJpgOnly = FilterJpgOnly;
-     Properties.Settings.Default.FilterPngOnly = FilterPngOnly;
-            Properties.Settings.Default.SkipFullResolutionCheck = SkipFullResolutionCheck;
-       Properties.Settings.Default.LimitScanCount = LimitScanCount;
-            Properties.Settings.Default.MaxImagesToScan = MaxImagesToScan;
-     Properties.Settings.Default.ItemsPerPage = ItemsPerPage;
-        Properties.Settings.Default.Save();
-}
-  }
+		// Save settings to portable JSON
+		public void SaveToPortableSettings(string downloadFolder, string lastUrl)
+		{
+			var appSettings = new PortableSettingsManager.AppSettings
+			{
+				DownloadFolder = downloadFolder,
+				LastUrl = lastUrl,
+				FilterBySize = FilterBySize,
+				MinimumImageSize = MinimumImageSize,
+				ShowThumbnails = ShowThumbnails,
+				LoadPreviews = LoadPreviews,
+				FilterJpgOnly = FilterJpgOnly,
+				FilterPngOnly = FilterPngOnly,
+				SkipFullResolutionCheck = SkipFullResolutionCheck,
+				LimitScanCount = LimitScanCount,
+				MaxImagesToScan = MaxImagesToScan,
+				ItemsPerPage = ItemsPerPage
+			};
+			PortableSettingsManager.SaveSettings(appSettings);
+		}
+	}
 
-    // Converter to get the index of a ListView item
- public class ListViewIndexConverter : IValueConverter
+	// Converter to get the index of a ListView item
+	public class ListViewIndexConverter : IValueConverter
     {
     public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
    {
