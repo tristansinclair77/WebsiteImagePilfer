@@ -1,0 +1,59 @@
+﻿So I said, "I published, launched the portable program, did a fast scan. I got the pop-up, "310 images found!" but the whole program froze completely. I can't click anything. What could've done this?"
+Then you proceeded to delete all of the code from MainWindow and got stuck in a cycle of restoring the file then breaking it over and over and over.... so stop that.
+Your solution was:
+Now I can see the exact issue. In the ScanOnlyButton_Click method, after scan completes, the code is:
+1.	Adding all 310 items to _imageItems
+2.	For EACH item, calling LoadAndSetPreviewAsync(item) immediately (line 257-261)
+3.	Then calling UpdatePagination() which calls LoadCurrentPage()
+4.	Then showing the MessageBox The problem is that all 310 preview images start loading at once, each making an HTTP request, and then all trying to update the UI through Dispatcher.InvokeAsync. This overwhelms the UI thread and causes the freeze. The fix is to:
+5.	Add a semaphore to throttle concurrent preview loads
+6.	Only load previews for the current page, not all items at once
+7.	Use proper async/await with ConfigureAwait(false)
+So what I want you to do now is to tell me the steps you'd take to solve this. Change no code.
+
+---
+
+Problem Analysis
+The freeze occurs in the ScanOnlyButton_Click method (lines 242-261) where:
+1.	All 310 images are added to _imageItems
+2.	For EACH item, LoadAndSetPreviewAsync(item) is called immediately via fire-and-forget (_ = LoadAndSetPreviewAsync(item))
+3.	This launches 310 concurrent HTTP requests all trying to download preview images
+4.	Each preview then tries to update the UI via Dispatcher.InvokeAsync
+5.	The UI thread gets overwhelmed with 310 simultaneous image decoding operations and dispatcher calls
+Solution Steps
+Step 1: Add a Semaphore for Throttling
+•	Add a SemaphoreSlim field to the MainWindow class to limit concurrent preview loads
+•	Initialize it in the constructor (e.g., _previewSemaphore = new SemaphoreSlim(5, 5) for max 5 concurrent loads)
+•	This prevents overwhelming the system with hundreds of simultaneous HTTP requests
+Step 2: Modify LoadAndSetPreviewAsync Method
+•	Wrap the entire method body in await _previewSemaphore.WaitAsync() / finally { _previewSemaphore.Release() }
+•	Add ConfigureAwait(false) to the LoadPreviewImageAsync call to avoid capturing sync context unnecessarily
+•	This ensures only N concurrent preview loads happen at once
+Step 3: Change Preview Loading Strategy in ScanOnlyButton_Click
+•	Remove the immediate preview loading loop (lines 257-261) that calls LoadAndSetPreviewAsync for all items
+•	Only set up the image items with their metadata, but DON'T load previews yet
+•	Let preview loading happen lazily
+Step 4: Implement Lazy Preview Loading in LoadCurrentPage
+•	Modify LoadCurrentPage() method to load previews ONLY for items on the current page
+•	After adding items to _currentPageItems, check if _settings.LoadPreviews is enabled
+•	If enabled, iterate through _currentPageItems and call LoadAndSetPreviewAsync for each
+•	This way, only 50 items (or whatever _itemsPerPage is set to) load previews at once, not all 310
+Step 5: Cancel Pending Preview Loads on Page Change
+•	Add a CancellationTokenSource specifically for preview loading operations
+•	Cancel and recreate it when the page changes (in PrevPageButton_Click and NextPageButton_Click)
+•	Pass this token to preview loading operations to avoid wasting resources on images no longer visible
+Step 6: Add Proper Async/Await Chain
+•	Ensure LoadCurrentPage() is async and properly awaited where called
+•	Update pagination methods that call LoadCurrentPage() to be async
+•	This prevents blocking the UI thread while previews load
+Key Benefits of This Approach
+1.	No simultaneous 310 HTTP requests - Only 5 (or configured amount) at a time via semaphore
+2.	Only visible images load - Current page items only (50 vs 310)
+3.	Responsive UI - Preview loading happens asynchronously without blocking
+4.	Cancellable - Can cancel pending loads when user navigates away
+5.	Memory efficient - Not loading 310 preview images into memory at once
+These steps will solve the freeze by ensuring:
+•	The UI thread never gets overwhelmed
+•	Network requests are throttled
+•	Only necessary previews are loaded
+•	All operations are properly async and cancellable
