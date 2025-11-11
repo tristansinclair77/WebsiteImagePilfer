@@ -10,7 +10,7 @@ namespace WebsiteImagePilfer.ViewModels
     {
         public event PropertyChangedEventHandler? PropertyChanged;
 
- /// <summary>
+        /// <summary>
         /// Sets the property value and raises PropertyChanged if the value has changed.
         /// </summary>
         /// <typeparam name="T">The type of the property.</typeparam>
@@ -18,23 +18,23 @@ namespace WebsiteImagePilfer.ViewModels
         /// <param name="value">The new value.</param>
         /// <param name="propertyName">Name of the property (auto-filled by compiler).</param>
         /// <returns>True if the value changed, false otherwise.</returns>
-   protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+        protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
         {
             if (EqualityComparer<T>.Default.Equals(field, value))
-         return false;
+            return false;
 
-         field = value;
-          OnPropertyChanged(propertyName);
+            field = value;
+            OnPropertyChanged(propertyName);
             return true;
         }
 
         /// <summary>
         /// Raises the PropertyChanged event for the specified property.
-      /// </summary>
-   /// <param name="propertyName">Name of the property that changed.</param>
+        /// </summary>
+        /// <param name="propertyName">Name of the property that changed.</param>
         protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-      }
+        }
     }
 }
