@@ -118,6 +118,7 @@ namespace WebsiteImagePilfer.Services
 
         /// <summary>
         /// Generates a unique file path by appending a number to the filename if it already exists.
+        /// If the filename already has a number suffix like "(1)", it will increment that number.
         /// </summary>
         private string GenerateUniqueFilePath(string originalPath)
         {
@@ -128,12 +129,30 @@ namespace WebsiteImagePilfer.Services
             var fileNameWithoutExt = IOPath.GetFileNameWithoutExtension(originalPath);
             var extension = IOPath.GetExtension(originalPath);
             
-            int counter = 1;
+            // Check if filename already has a number suffix like "(1)", "(2)", etc.
+            var match = System.Text.RegularExpressions.Regex.Match(fileNameWithoutExt, @"^(.+?)\s*\((\d+)\)$");
+            
+            string baseName;
+            int counter;
+            
+            if (match.Success)
+            {
+                // File already has a number - use the base name and start from the existing number
+                baseName = match.Groups[1].Value;
+                counter = int.Parse(match.Groups[2].Value);
+            }
+            else
+            {
+                // No existing number - start from 1
+                baseName = fileNameWithoutExt;
+                counter = 1;
+            }
+            
             string newPath;
             
             do
             {
-                newPath = IOPath.Combine(directory, $"{fileNameWithoutExt} ({counter}){extension}");
+                newPath = IOPath.Combine(directory, $"{baseName} ({counter}){extension}");
                 counter++;
             }
             while (File.Exists(newPath));
