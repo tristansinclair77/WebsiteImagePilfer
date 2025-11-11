@@ -17,6 +17,11 @@ namespace WebsiteImagePilfer.Models
         public HashSet<string> AllowedFileTypes { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         
         public bool SkipFullResolutionCheck { get; set; }
+        
+        // Booru mode: Enables specialized handling for Booru-style sites (safebooru, gelbooru, danbooru, etc.)
+        // These sites use a 3-tier structure: thumbnail ? sample ? full resolution
+        public bool EnableBooruMode { get; set; } = false;
+        
         public bool LimitScanCount { get; set; }
         public int MaxImagesToScan { get; set; } = 20;
         public bool LoadPreviews { get; set; } = true;
@@ -39,6 +44,7 @@ namespace WebsiteImagePilfer.Models
             ShowThumbnails = appSettings.ShowThumbnails;
             LoadPreviews = appSettings.LoadPreviews;
             SkipFullResolutionCheck = appSettings.SkipFullResolutionCheck;
+            EnableBooruMode = appSettings.EnableBooruMode;
             LimitScanCount = appSettings.LimitScanCount;
             MaxImagesToScan = appSettings.MaxImagesToScan;
             ItemsPerPage = appSettings.ItemsPerPage;
@@ -84,6 +90,7 @@ namespace WebsiteImagePilfer.Models
                 ShowThumbnails = ShowThumbnails,
                 LoadPreviews = LoadPreviews,
                 SkipFullResolutionCheck = SkipFullResolutionCheck,
+                EnableBooruMode = EnableBooruMode,
                 LimitScanCount = LimitScanCount,
                 MaxImagesToScan = MaxImagesToScan,
                 ItemsPerPage = ItemsPerPage,

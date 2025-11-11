@@ -104,6 +104,13 @@ Style="{StaticResource SimpleCheckBox}"
          Content="Skip full-resolution check (faster, download previews only)"/>
      <TextBlock Style="{StaticResource HelpText}"
                 Text="When unchecked: App will try to find and download full-resolution images instead of previews/thumbnails"/>
+    
+    <CheckBox x:Name="EnableBooruModeCheckBox" 
+              Style="{StaticResource SimpleCheckBox}"
+              Content="Enable Booru Mode (for Safebooru, Gelbooru, Danbooru, etc.)"
+              Margin="{StaticResource MarginTopStandard}"/>
+    <TextBlock Style="{StaticResource HelpText}"
+               Text="Specialized handling for Booru-style sites with multi-tier image resolution (thumbnail ? sample ? full). Automatically extracts full-resolution images from detail pages."/>
     </StackPanel>
     </GroupBox>
   

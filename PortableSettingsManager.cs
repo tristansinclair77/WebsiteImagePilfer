@@ -22,6 +22,7 @@ namespace WebsiteImagePilfer
             public bool FilterJpgOnly { get; set; } = false;
             public bool FilterPngOnly { get; set; } = false;
             public bool SkipFullResolutionCheck { get; set; } = false;
+            public bool EnableBooruMode { get; set; } = false;
             public bool LimitScanCount { get; set; } = false;
             public int MaxImagesToScan { get; set; } = 20;
             public int ItemsPerPage { get; set; } = 50;

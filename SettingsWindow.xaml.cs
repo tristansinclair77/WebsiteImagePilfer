@@ -24,6 +24,7 @@ namespace WebsiteImagePilfer
             FilterWebpCheckBox.IsChecked = _settings.AllowedFileTypes.Contains(".webp");
             
             SkipFullResCheckBox.IsChecked = _settings.SkipFullResolutionCheck;
+            EnableBooruModeCheckBox.IsChecked = _settings.EnableBooruMode;
             LimitScanCheckBox.IsChecked = _settings.LimitScanCount;
             MaxImagesSlider.Value = _settings.MaxImagesToScan;
             LoadPreviewsCheckBox.IsChecked = _settings.LoadPreviews;
@@ -66,6 +67,7 @@ namespace WebsiteImagePilfer
             }
             
             _settings.SkipFullResolutionCheck = SkipFullResCheckBox.IsChecked.GetValueOrDefault();
+            _settings.EnableBooruMode = EnableBooruModeCheckBox.IsChecked.GetValueOrDefault();
             _settings.LimitScanCount = LimitScanCheckBox.IsChecked.GetValueOrDefault();
             _settings.MaxImagesToScan = (int)MaxImagesSlider.Value;
             _settings.LoadPreviews = LoadPreviewsCheckBox.IsChecked.GetValueOrDefault();

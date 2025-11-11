@@ -717,6 +717,12 @@ namespace WebsiteImagePilfer.Services
             htmlDoc.LoadHtml(renderedHtml);
             var baseUri = new Uri(baseUrl);
 
+            // BOORU MODE: First, scan for detail page links before processing individual images
+            if (_settings.EnableBooruMode)
+            {
+                ExtractBooruDetailPageLinks(htmlDoc, baseUri, imageUrls, cancellationToken);
+            }
+
             ExtractFromImageTags(htmlDoc, baseUri, imageUrls, cancellationToken);
             
             // Background images - only if checking background images
@@ -729,6 +735,70 @@ namespace WebsiteImagePilfer.Services
             ExtractFromRegex(renderedHtml, imageUrls, cancellationToken);
         }
 
+        /// <summary>
+        /// Booru Mode: Scans for all detail/view page links on a Booru list page.
+        /// These links follow the pattern: ?page=post&s=view&id=12345
+        /// Each link will be queued for processing during download.
+        /// </summary>
+        private void ExtractBooruDetailPageLinks(HtmlDocument htmlDoc, Uri baseUri, HashSet<string> imageUrls, CancellationToken cancellationToken)
+        {
+            Logger.Info("Booru mode: Scanning for detail page links...");
+            
+            int detailLinksFound = 0;
+            
+            // Find all <a> links on the page
+            var allLinks = htmlDoc.DocumentNode.SelectNodes("//a[@href]");
+            if (allLinks == null)
+            {
+                Logger.Warning("Booru mode: No links found on page");
+                return;
+            }
+            
+            foreach (var link in allLinks)
+            {
+                if (cancellationToken.IsCancellationRequested) break;
+                
+                var href = link.GetAttributeValue("href", "");
+                if (string.IsNullOrEmpty(href)) continue;
+                
+                // Check if this is a Booru detail/view page link
+                var lowerHref = href.ToLowerInvariant();
+                bool isBooruDetailPage = lowerHref.Contains("page=post") && 
+                                         (lowerHref.Contains("s=view") || lowerHref.Contains("s=show"));
+                
+                if (isBooruDetailPage)
+                {
+                    // Convert to absolute URL
+                    if (Uri.TryCreate(baseUri, href, out Uri? detailPageUri))
+                    {
+                        var detailUrl = detailPageUri.ToString();
+                        
+                        // Extract post ID for logging
+                        var idMatch = System.Text.RegularExpressions.Regex.Match(href, @"[?&]id=(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        var postId = idMatch.Success ? idMatch.Groups[1].Value : "unknown";
+                        
+                        // Add to image URLs collection
+                        if (imageUrls.Add(detailUrl))
+                        {
+                            detailLinksFound++;
+                            Logger.Debug($"Booru mode: Found detail page for post ID {postId}");
+                        }
+                    }
+                }
+            }
+            
+            if (detailLinksFound > 0)
+            {
+                Logger.Info($"Booru mode: Found {detailLinksFound} detail page links");
+                _updateStatus($"Booru mode: Found {detailLinksFound} post detail pages");
+            }
+            else
+            {
+                Logger.Warning("Booru mode: No detail page links found. This might not be a Booru list page, or the page structure is different.");
+                _updateStatus("Booru mode: No detail pages found - check if you're on a list/search page");
+            }
+        }
+
         private void ExtractFromImageTags(HtmlDocument htmlDoc, Uri baseUri, HashSet<string> imageUrls, CancellationToken cancellationToken)
         {
             var imgNodes = htmlDoc.DocumentNode.SelectNodes("//img");
@@ -737,6 +807,18 @@ namespace WebsiteImagePilfer.Services
             foreach (var img in imgNodes)
             {
                 if (cancellationToken.IsCancellationRequested) break;
+
+                // BOORU MODE: Check if image is wrapped in a link to a detail/view page
+                // NOTE: We now do this globally in ExtractBooruDetailPageLinks, but keep this as fallback
+                if (_settings.EnableBooruMode)
+                {
+                    string? booruFullResUrl = GetBooruFullResolutionUrl(img, baseUri);
+                    if (booruFullResUrl != null)
+                    {
+                        imageUrls.Add(booruFullResUrl);
+                        continue; // Skip normal processing for Booru images
+                    }
+                }
 
                 // Check if image is wrapped in a link to full-resolution
                 string? fullResUrl = GetFullResolutionUrlFromParentLink(img, baseUri);
@@ -763,6 +845,93 @@ namespace WebsiteImagePilfer.Services
             }
         }
         
+        /// <summary>
+        /// Special handling for Booru-style sites where thumbnails link to detail pages.
+        /// Extracts the detail page URL or derives the full-resolution image URL.
+        /// 
+        /// Example flow:
+        /// 1. Thumbnail on list page links to: /index.php?page=post&s=view&id=6221306
+        /// 2. Detail page contains sample: /samples/289/sample_HASH.jpg
+        /// 3. Full resolution is at: /images/289/HASH.jpg
+        /// 
+        /// This method returns the detail page URL which will be processed during download.
+        /// </summary>
+        private string? GetBooruFullResolutionUrl(HtmlNode img, Uri baseUri)
+        {
+            var parentLink = img.ParentNode;
+            if (parentLink?.Name != "a") return null;
+
+            var href = parentLink.GetAttributeValue("href", "");
+            if (string.IsNullOrEmpty(href)) return null;
+
+            // Check if this is a Booru detail/view page link
+            var lowerHref = href.ToLowerInvariant();
+            bool isBooruDetailPage = lowerHref.Contains("page=post") && 
+                                     (lowerHref.Contains("s=view") || lowerHref.Contains("s=show"));
+            
+            if (isBooruDetailPage)
+            {
+                // This is a detail page link - return it for processing during download
+                if (Uri.TryCreate(baseUri, href, out Uri? detailPageUri))
+                {
+                    // Try to extract post ID for logging
+                    var idMatch = System.Text.RegularExpressions.Regex.Match(href, @"[?&]id=(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (idMatch.Success)
+                    {
+                        var postId = idMatch.Groups[1].Value;
+                        Logger.Debug($"Booru: Found detail page for post ID {postId}: {detailPageUri}");
+                    }
+                    else
+                    {
+                        Logger.Debug($"Booru: Found detail page (no ID extracted): {detailPageUri}");
+                    }
+                    
+                    return detailPageUri.ToString();
+                }
+            }
+            else
+            {
+                // Not a Booru detail page - check if it's a direct image link
+                bool isDirectImageLink = Images.Extensions.Any(ext => lowerHref.Contains(ext));
+                
+                if (isDirectImageLink && Uri.TryCreate(baseUri, href, out Uri? directUri))
+                {
+                    // Try to transform sample/thumbnail to full resolution
+                    var urlString = directUri.ToString();
+                    
+                    if (urlString.Contains("/samples/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var fullResUrl = System.Text.RegularExpressions.Regex.Replace(
+                            urlString,
+                            @"/samples/(\d+)/sample_(.+)",
+                            "/images/$1/$2",
+                            System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                        );
+                        Logger.Debug($"Booru: Transformed sample link to full-res: {fullResUrl}");
+                        return fullResUrl;
+                    }
+                    else if (urlString.Contains("/thumbnails/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var fullResUrl = System.Text.RegularExpressions.Regex.Replace(
+                            urlString,
+                            @"/thumbnails/(\d+)/thumbnail_(.+)",
+                            "/images/$1/$2",
+                            System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                        );
+                        Logger.Debug($"Booru: Transformed thumbnail link to full-res: {fullResUrl}");
+                        return fullResUrl;
+                    }
+                    else
+                    {
+                        Logger.Debug($"Booru: Found direct image link: {urlString}");
+                        return urlString;
+                    }
+                }
+            }
+
+            return null;
+        }
+
         private void ExtractBackgroundImages(HtmlDocument htmlDoc, Uri baseUri, HashSet<string> imageUrls, CancellationToken cancellationToken)
         {
             var elementsWithStyle = htmlDoc.DocumentNode.SelectNodes("//*[@style]");

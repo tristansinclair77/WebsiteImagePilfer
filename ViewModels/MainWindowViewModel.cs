@@ -419,8 +419,18 @@ namespace WebsiteImagePilfer.ViewModels
                     var item = new ImageDownloadItem { Url = imageUrl, Status = Status.Ready, FileName = fileName };
                     ImageItems.Add(item);
 
-                    if (Settings.LoadPreviews)
+                    // BOORU MODE FIX: Skip preview loading for Booru detail pages
+                    // These are HTML pages, not direct image URLs, and will be resolved during download
+                    bool isBooruDetailPage = Settings.EnableBooruMode && IsBooruDetailPageUrl(imageUrl);
+                    
+                    if (Settings.LoadPreviews && !isBooruDetailPage)
+                    {
                         _ = LoadAndSetPreviewAsync(item);
+                    }
+                    else if (isBooruDetailPage)
+                    {
+                        Logger.Debug($"Skipping preview load for Booru detail page: {imageUrl}");
+                    }
 
                     if (Settings.LimitScanCount && ImageItems.Count >= Settings.MaxImagesToScan)
                         break;
@@ -428,15 +438,16 @@ namespace WebsiteImagePilfer.ViewModels
 
                 string scanType = IsFastScan ? "Fast" : "Thorough";
                 string limitInfo = Settings.LimitScanCount ? $" (limited to {Settings.MaxImagesToScan})" : "";
+                string booruInfo = Settings.EnableBooruMode ? " (Booru mode)" : "";
 
                 _currentPage = 1;
                 UpdatePagination();
                 SetScanCompleteState(ImageItems.Count, ImageItems.Count > 0);
-                StatusText = $"Found {ImageItems.Count} images{limitInfo} ({scanType} scan). Click 'Download' to save them.";
+                StatusText = $"Found {ImageItems.Count} images{limitInfo}{booruInfo} ({scanType} scan). Click 'Download' to save them.";
 
                 string scanMessage = Settings.LimitScanCount
-                    ? $"Found {ImageItems.Count} images (limited to {Settings.MaxImagesToScan}) using {scanType} scan!\n\nDuplicates were automatically skipped.\n\nReview the list and click 'Download' when ready."
-                    : $"Found {ImageItems.Count} images using {scanType} scan!\n\nReview the list and click 'Download' when ready.";
+                    ? $"Found {ImageItems.Count} images (limited to {Settings.MaxImagesToScan}) using {scanType} scan{booruInfo}!\n\nDuplicates were automatically skipped.\n\nReview the list and click 'Download' when ready."
+                    : $"Found {ImageItems.Count} images using {scanType} scan{booruInfo}!\n\nReview the list and click 'Download' when ready.";
 
                 ShowInfo(scanMessage, "Scan Complete");
             }
@@ -456,6 +467,32 @@ namespace WebsiteImagePilfer.ViewModels
                 _cancellationTokenSource?.Dispose();
                 _cancellationTokenSource = null;
             }
+        }
+
+        /// <summary>
+        /// Checks if a URL is a Booru detail/view page rather than a direct image URL.
+        /// Used to skip preview loading for these pages since they're HTML, not images.
+        /// </summary>
+        private bool IsBooruDetailPageUrl(string url)
+        {
+            var lowerUrl = url.ToLowerInvariant();
+            
+            // Check if it's from a known Booru site
+            bool isBooruSite = lowerUrl.Contains("safebooru") || 
+                              lowerUrl.Contains("gelbooru") || 
+                              lowerUrl.Contains("danbooru") ||
+                              lowerUrl.Contains("konachan") ||
+                              lowerUrl.Contains("yande.re") ||
+                              lowerUrl.Contains("sankaku");
+            
+            if (!isBooruSite)
+                return false;
+            
+            // Check if it's a detail/view page
+            bool isDetailPage = lowerUrl.Contains("page=post") &&
+                               (lowerUrl.Contains("s=view") || lowerUrl.Contains("s=show"));
+            
+            return isDetailPage;
         }
 
         private async Task DownloadAllAsync()
