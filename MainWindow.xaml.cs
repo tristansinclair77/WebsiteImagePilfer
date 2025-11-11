@@ -25,39 +25,32 @@ using WebsiteImagePilfer.Models;
 using WebsiteImagePilfer.Services;
 using WebsiteImagePilfer.Helpers;
 using WebsiteImagePilfer.Converters;
+using WebsiteImagePilfer.Constants;
+using static WebsiteImagePilfer.Constants.AppConstants;
 
 namespace WebsiteImagePilfer
 {
     public partial class MainWindow : Window
     {
-        private const string STATUS_READY = "Ready";
-        private const string STATUS_DONE = "✓ Done";
-        private const string STATUS_BACKUP = "✓ Backup";
-        private const string STATUS_DUPLICATE = "⊘ Duplicate";
-        private const string STATUS_FAILED = "✗ Failed";
-        private const string STATUS_SKIPPED = "⊘ Skipped";
- private const string STATUS_CANCELLED = "⊘ Canceled";
- private const string STATUS_DOWNLOADING = "Downloading...";
-        private const string STATUS_CHECKING = "Checking...";
-        private const string STATUS_FINDING_FULLRES = "Finding full-res...";
+  // Constants removed - using AppConstants
 
         private readonly HttpClient _httpClient;
-        private ObservableCollection<ImageDownloadItem> _imageItems;
+  private ObservableCollection<ImageDownloadItem> _imageItems;
         private ObservableCollection<ImageDownloadItem> _currentPageItems;
- private ObservableCollection<ImageDownloadItem> _filteredImageItems;
-        private string _downloadFolder;
-        private CancellationTokenSource? _cancellationTokenSource;
-      private DownloadSettings _settings;
-    private List<string> _scannedImageUrls;
-        private int _currentPage = 1;
-        private int _itemsPerPage = 50;
+        private ObservableCollection<ImageDownloadItem> _filteredImageItems;
+      private string _downloadFolder;
+     private CancellationTokenSource? _cancellationTokenSource;
+        private DownloadSettings _settings;
+        private List<string> _scannedImageUrls;
+    private int _currentPage = 1;
+    private int _itemsPerPage = 50;
         private int _totalPages = 1;
         private double _lastPreviewColumnWidth = 0;
-     private System.Timers.Timer? _columnResizeTimer;
-    
+  private System.Timers.Timer? _columnResizeTimer;
+        
         private ImageScanner? _imageScanner;
-private ImageDownloader? _imageDownloader;
- private ImagePreviewLoader? _previewLoader;
+        private ImageDownloader? _imageDownloader;
+      private ImagePreviewLoader? _previewLoader;
         private UIStateManager? _uiStateManager;
 
         /// <summary>
@@ -99,84 +92,84 @@ _currentPageItems = new ObservableCollection<ImageDownloadItem>();
         }
 
     private void SetupUIMonitoring()
-     {
-   PreviewColumn.Width = 150;
-  _lastPreviewColumnWidth = 150;
-            
-     _columnResizeTimer = new System.Timers.Timer(500) { AutoReset = false };
-    _columnResizeTimer.Elapsed += ColumnResizeTimer_Elapsed;
- 
+        {
+            PreviewColumn.Width = 150;
+ _lastPreviewColumnWidth = 150;
+     
+      _columnResizeTimer = new System.Timers.Timer(Preview.ColumnResizeDebounceMs) { AutoReset = false };
+            _columnResizeTimer.Elapsed += ColumnResizeTimer_Elapsed;
+      
        var columnWidthMonitor = new System.Windows.Threading.DispatcherTimer 
-            { 
-        Interval = TimeSpan.FromMilliseconds(100) 
-            };
-    columnWidthMonitor.Tick += (s, e) => CheckColumnWidthChanged();
+      { 
+  Interval = TimeSpan.FromMilliseconds(Preview.ColumnWidthMonitorIntervalMs) 
+          };
+         columnWidthMonitor.Tick += (s, e) => CheckColumnWidthChanged();
             columnWidthMonitor.Start();
         
-  _imageItems.CollectionChanged += (s, e) => 
-       {
-    if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add ||
-         e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
-              ApplyStatusFilter();
+            _imageItems.CollectionChanged += (s, e) => 
+    {
+ if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add ||
+                e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+          ApplyStatusFilter();
 
-    if (e.NewItems != null)
-      foreach (ImageDownloadItem item in e.NewItems)
-       item.PropertyChanged += ImageItem_PropertyChanged;
-          };
+           if (e.NewItems != null)
+            foreach (ImageDownloadItem item in e.NewItems)
+ item.PropertyChanged += ImageItem_PropertyChanged;
+            };
         }
 
         private void InitializeServices()
-  {
-    _imageScanner = new ImageScanner(status => StatusText.Dispatcher.Invoke(() => StatusText.Text = status));
+        {
+ _imageScanner = new ImageScanner(status => StatusText.Dispatcher.Invoke(() => StatusText.Text = status));
             _imageDownloader = new ImageDownloader(_httpClient, _settings, _downloadFolder);
-            _previewLoader = new ImagePreviewLoader(_httpClient);
-            _uiStateManager = new UIStateManager(
-           ScanOnlyButton, DownloadButton, DownloadSelectedButton, CancelButton,
-                FastScanCheckBox, StatusText, DownloadProgress,
-    () => ImageList.SelectedItems.Cast<ImageDownloadItem>().Count(item => item.Status == STATUS_READY));
-            _uiStateManager.SetReadyState();
-      }
+    _previewLoader = new ImagePreviewLoader(_httpClient);
+          _uiStateManager = new UIStateManager(
+                ScanOnlyButton, DownloadButton, DownloadSelectedButton, CancelButton,
+         FastScanCheckBox, StatusText, DownloadProgress,
+         () => ImageList.SelectedItems.Cast<ImageDownloadItem>().Count(item => item.Status == Status.Ready));
+ _uiStateManager.SetReadyState();
+        }
 
         private void CheckColumnWidthChanged()
-{
-            if (PreviewColumn.ActualWidth > 0 && Math.Abs(PreviewColumn.ActualWidth - _lastPreviewColumnWidth) > 10)
-            {
-        _columnResizeTimer?.Stop();
-    _columnResizeTimer?.Start();
-          }
-        }
-
-        private async void ColumnResizeTimer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e)
-  {
-      await Dispatcher.InvokeAsync(async () =>
-            {
- if (PreviewColumn.ActualWidth > 0 && _settings.LoadPreviews)
-   {
-        _lastPreviewColumnWidth = PreviewColumn.ActualWidth;
-  _uiStateManager!.UpdateStatus("Reloading previews at new resolution...");
-                  await ReloadAllPreviewsAsync();
-     _uiStateManager.UpdateStatus(STATUS_READY);
-            }
-            });
-        }
-
-  private async Task ReloadAllPreviewsAsync()
         {
-            var itemsWithPreviews = _imageItems.Where(i => !string.IsNullOrEmpty(i.Url) && _settings.LoadPreviews).ToList();
-       foreach (var item in itemsWithPreviews)
-            {
-    try
-         {
-         var newPreview = await _previewLoader!.LoadPreviewImageFromColumnWidthAsync(item.Url, PreviewColumn.ActualWidth);
-    if (newPreview != null)
-    item.PreviewImage = newPreview;
-     }
-            catch (Exception ex)
-    {
-              System.Diagnostics.Debug.WriteLine($"Failed to reload preview for {item.Url}: {ex.Message}");
-                }
+            if (PreviewColumn.ActualWidth > 0 && Math.Abs(PreviewColumn.ActualWidth - _lastPreviewColumnWidth) > Preview.ColumnWidthChangeThreshold)
+       {
+      _columnResizeTimer?.Stop();
+                _columnResizeTimer?.Start();
             }
-   }
+        }
+
+   private async void ColumnResizeTimer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e)
+     {
+        await Dispatcher.InvokeAsync(async () =>
+   {
+   if (PreviewColumn.ActualWidth > 0 && _settings.LoadPreviews)
+   {
+   _lastPreviewColumnWidth = PreviewColumn.ActualWidth;
+           _uiStateManager!.UpdateStatus("Reloading previews at new resolution...");
+            await ReloadAllPreviewsAsync();
+       _uiStateManager.UpdateStatus(Status.Ready);
+    }
+    });
+        }
+
+        private async Task ReloadAllPreviewsAsync()
+     {
+    var itemsWithPreviews = _imageItems.Where(i => !string.IsNullOrEmpty(i.Url) && _settings.LoadPreviews).ToList();
+      foreach (var item in itemsWithPreviews)
+  {
+     try
+      {
+        var newPreview = await _previewLoader!.LoadPreviewImageFromColumnWidthAsync(item.Url, PreviewColumn.ActualWidth);
+           if (newPreview != null)
+       item.PreviewImage = newPreview;
+     }
+      catch (Exception ex)
+      {
+    Logger.Error($"Failed to reload preview for {item.Url}", ex);
+       }
+         }
+        }
 
         private async void ScanOnlyButton_Click(object sender, RoutedEventArgs e)
         {
@@ -225,7 +218,7 @@ if (string.IsNullOrEmpty(url))
             if (_settings.LimitScanCount && File.Exists(filePath))
            continue;
 
-  var item = new ImageDownloadItem { Url = imageUrl, Status = STATUS_READY, FileName = fileName };
+  var item = new ImageDownloadItem { Url = imageUrl, Status = Status.Ready, FileName = fileName };
       _imageItems.Add(item);
 
            if (_settings.LoadPreviews)
@@ -268,18 +261,18 @@ if (string.IsNullOrEmpty(url))
         }
 
         private async Task LoadAndSetPreviewAsync(ImageDownloadItem item)
-   {
-            try
+      {
+   try
      {
-       var preview = await _previewLoader!.LoadPreviewImageFromColumnWidthAsync(item.Url, PreviewColumn.ActualWidth);
-       if (preview != null)
-  await Dispatcher.InvokeAsync(() => item.PreviewImage = preview);
-            }
-catch (Exception ex)
-    {
-          System.Diagnostics.Debug.WriteLine($"Failed to load preview for {item.Url}: {ex.Message}");
+        var preview = await _previewLoader!.LoadPreviewImageFromColumnWidthAsync(item.Url, PreviewColumn.ActualWidth);
+     if (preview != null)
+            await Dispatcher.InvokeAsync(() => item.PreviewImage = preview);
+ }
+     catch (Exception ex)
+       {
+  Logger.Error($"Failed to load preview for {item.Url}", ex);
+       }
   }
-     }
 
         private async void DownloadButton_Click(object sender, RoutedEventArgs e)
         {
@@ -289,7 +282,7 @@ catch (Exception ex)
            return;
             }
 
-       await PerformDownloadAsync(_imageItems.Where(i => i.Status == STATUS_READY).ToList(), _imageItems.Count);
+       await PerformDownloadAsync(_imageItems.Where(i => i.Status == Status.Ready).ToList(), _imageItems.Count);
         }
 
    private async void DownloadSelectedButton_Click(object sender, RoutedEventArgs e)
@@ -302,7 +295,7 @@ catch (Exception ex)
    return;
      }
 
-var readyItems = selectedItems.Where(item => item.Status == STATUS_READY).ToList();
+var readyItems = selectedItems.Where(item => item.Status == Status.Ready).ToList();
  
          if (readyItems.Count == 0)
           {
@@ -359,25 +352,25 @@ var readyItems = selectedItems.Where(item => item.Status == STATUS_READY).ToList
             if (!Directory.Exists(_downloadFolder))
    Directory.CreateDirectory(_downloadFolder);
 
-    int downloadedCount = 0, skippedCount = 0, duplicateCount = 0;
+   int downloadedCount = 0, skippedCount = 0, duplicateCount = 0;
 
-  foreach (var item in items)
-  {
-        cancellationToken.ThrowIfCancellationRequested();
-     await _imageDownloader!.DownloadSingleItemAsync(item, cancellationToken);
+   foreach (var item in items)
+       {
+  cancellationToken.ThrowIfCancellationRequested();
+           await _imageDownloader!.DownloadSingleItemAsync(item, cancellationToken);
 
-    if (item.Status == STATUS_DONE) downloadedCount++;
-                else if (item.Status.Contains("Duplicate")) { skippedCount++; duplicateCount++; }
-              else if (item.Status.Contains("Skipped")) skippedCount++;
+  if (item.Status == Status.Done) downloadedCount++;
+       else if (item.Status.Contains(Status.Duplicate)) { skippedCount++; duplicateCount++; }
+      else if (item.Status.Contains(Status.Skipped)) skippedCount++;
 
-          int remaining = total - (downloadedCount + skippedCount);
-                _uiStateManager!.UpdateDownloadProgress(downloadedCount, skippedCount, duplicateCount, remaining, total);
-  await Task.Delay(10, cancellationToken);
-       }
+      int remaining = total - (downloadedCount + skippedCount);
+       _uiStateManager!.UpdateDownloadProgress(downloadedCount, skippedCount, duplicateCount, remaining, total);
+       await Task.Delay(10, cancellationToken);
+     }
 
-   LoadCurrentPage();
-            return downloadedCount;
-    }
+      LoadCurrentPage();
+    return downloadedCount;
+  }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)
         {
@@ -386,15 +379,15 @@ var readyItems = selectedItems.Where(item => item.Status == STATUS_READY).ToList
   }
 
         private void ImageList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
- {
-      if (ImageList.SelectedItem is ImageDownloadItem item)
-            {
-    if (item.Status == STATUS_DONE || item.Status == STATUS_BACKUP || item.Status == STATUS_DUPLICATE)
-     OpenDownloadedFile(item);
-      else
-   _ = DownloadSingleImageAsync(item);
-   }
-        }
+    {
+       if (ImageList.SelectedItem is ImageDownloadItem item)
+       {
+ if (item.Status == Status.Done || item.Status == Status.Backup || item.Status == Status.Duplicate)
+        OpenDownloadedFile(item);
+    else
+     _ = DownloadSingleImageAsync(item);
+ }
+}
 
         private void OpenDownloadedFile(ImageDownloadItem item)
    {
@@ -427,448 +420,448 @@ System.Diagnostics.Process.Start(processStartInfo);
 
       private async Task DownloadSingleImageAsync(ImageDownloadItem item)
 {
-     if (item.Status == STATUS_DONE || item.Status == STATUS_DUPLICATE)
-        {
-    ShowInfo($"Image already downloaded: {item.FileName}", "Already Downloaded");
-       return;
+      if (item.Status == Status.Done || item.Status == Status.Duplicate)
+      {
+     ShowInfo($"Image already downloaded: {item.FileName}", "Already Downloaded");
+     return;
             }
 
-            var originalStatus = item.Status;
-            item.Status = STATUS_DOWNLOADING;
+var originalStatus = item.Status;
+        item.Status = Status.Downloading;
 
-  try
-     {
-            await _imageDownloader!.DownloadSingleItemAsync(item, CancellationToken.None);
-        if (item.Status == STATUS_DONE)
-    _uiStateManager!.UpdateStatus($"Downloaded: {item.FileName}");
-            }
-    catch (Exception ex)
-        {
-    item.Status = STATUS_FAILED;
-                item.ErrorMessage = ex.Message;
-                ShowError($"Failed to download: {ex.Message}", "Download Error");
+         try
+    {
+     await _imageDownloader!.DownloadSingleItemAsync(item, CancellationToken.None);
+if (item.Status == Status.Done)
+ _uiStateManager!.UpdateStatus($"Downloaded: {item.FileName}");
+          }
+       catch (Exception ex)
+      {
+      item.Status = Status.Failed;
+      item.ErrorMessage = ex.Message;
+ ShowError($"Failed to download: {ex.Message}", "Download Error");
+  }
       }
-        }
 
         private async void ContextMenu_Download_Click(object sender, RoutedEventArgs e)
-        {
-            if (ImageList.SelectedItem is ImageDownloadItem item)
+   {
+       if (ImageList.SelectedItem is ImageDownloadItem item)
  await DownloadSingleImageWithForceAsync(item);
         }
 
-        private async Task DownloadSingleImageWithForceAsync(ImageDownloadItem item)
-        {
-       item.Status = STATUS_DOWNLOADING;
+     private async Task DownloadSingleImageWithForceAsync(ImageDownloadItem item)
+{
+        item.Status = Status.Downloading;
 
-   try
-    {
-    await _imageDownloader!.DownloadSingleItemAsync(item, CancellationToken.None);
-          _uiStateManager!.UpdateStatus($"Downloaded (forced): {item.FileName}");
+      try
+ {
+       await _imageDownloader!.DownloadSingleItemAsync(item, CancellationToken.None);
+   _uiStateManager!.UpdateStatus($"Downloaded (forced): {item.FileName}");
+            }
+       catch (Exception ex)
+ {
+   item.Status = Status.Failed;
+    item.ErrorMessage = ex.Message;
+     ShowError($"Failed to download: {ex.Message}", "Download Error");
      }
-    catch (Exception ex)
-            {
-         item.Status = STATUS_FAILED;
-  item.ErrorMessage = ex.Message;
-          ShowError($"Failed to download: {ex.Message}", "Download Error");
- }
-        }
+}
 
-   private async void ContextMenu_ReloadPreview_Click(object sender, RoutedEventArgs e)
-   {
-    if (ImageList.SelectedItem is ImageDownloadItem item)
-    await ReloadSinglePreviewAsync(item);
-        }
-
-        private async Task ReloadSinglePreviewAsync(ImageDownloadItem item)
-        {
- if (!_settings.LoadPreviews)
-            {
-      ShowInfo("Preview loading is disabled in Settings. Please enable 'Load preview images during scan' to use this feature.", "Preview Loading Disabled");
-            return;
-            }
-
-    try
-            {
-          _uiStateManager!.UpdateStatus($"Reloading preview for {item.FileName}...");
-     item.PreviewImage = null;
-
-    var newPreview = await _previewLoader!.LoadPreviewImageFromColumnWidthAsync(item.Url, PreviewColumn.ActualWidth);
-     if (newPreview != null)
-            {
- item.PreviewImage = newPreview;
-  _uiStateManager.UpdateStatus($"Preview reloaded for {item.FileName}");
- }
-              else
+  private void CancelSingleDownload(ImageDownloadItem item)
+      {
+            if (item.Status == Status.Downloading || item.Status == Status.Checking || item.Status == Status.FindingFullRes)
     {
-          _uiStateManager.UpdateStatus($"Failed to reload preview for {item.FileName}");
-          ShowWarning($"Failed to reload preview for {item.FileName}. The image URL may be invalid or unavailable.", "Preview Load Failed");
-  }
+      item.Status = Status.Cancelled;
+   item.ErrorMessage = "Canceled by user";
+    _uiStateManager!.UpdateStatus($"Canceled download: {item.FileName}");
+      }
+   else
+{
+  ShowInfo($"Cannot cancel - item is not currently downloading.\nCurrent status: {item.Status}", "Cannot Cancel");
+            }
+        }
+
+        private void ApplyStatusFilter()
+        {
+   if (FilterReadyCheckBox == null || _filteredImageItems == null || _imageItems == null)
+      return;
+
+         ImageDownloadItem? firstVisibleItem = _currentPageItems.Count > 0 ? _currentPageItems[0] : null;
+          _filteredImageItems.Clear();
+
+    foreach (var item in _imageItems)
+            {
+       bool include = (FilterReadyCheckBox.IsChecked.GetValueOrDefault() && item.Status == Status.Ready) ||
+    (FilterDoneCheckBox.IsChecked.GetValueOrDefault() && item.Status == Status.Done) ||
+            (FilterBackupCheckBox.IsChecked.GetValueOrDefault() && item.Status == Status.Backup) ||
+   (FilterDuplicateCheckBox.IsChecked.GetValueOrDefault() && item.Status == Status.Duplicate) ||
+  (FilterFailedCheckBox.IsChecked.GetValueOrDefault() && item.Status == Status.Failed) ||
+      (FilterSkippedCheckBox.IsChecked.GetValueOrDefault() && item.Status.Contains(Status.Skipped)) ||
+          (FilterCancelledCheckBox.IsChecked.GetValueOrDefault() && item.Status == Status.Cancelled) ||
+       (FilterDownloadingCheckBox.IsChecked.GetValueOrDefault() && 
+(item.Status == Status.Downloading || item.Status == Status.Checking || item.Status == Status.FindingFullRes));
+
+          if (include)
+              _filteredImageItems.Add(item);
           }
-        catch (Exception ex)
-            {
-                _uiStateManager!.UpdateStatus($"Error reloading preview: {ex.Message}");
-           ShowError($"Error reloading preview: {ex.Message}", "Preview Error");
+
+            if (firstVisibleItem != null)
+{
+       int newIndex = _filteredImageItems.IndexOf(firstVisibleItem);
+            if (newIndex >= 0)
+        _currentPage = (newIndex / _itemsPerPage) + 1;
             }
-        }
-
-        private void ContextMenu_Cancel_Click(object sender, RoutedEventArgs e)
-        {
-            if (ImageList.SelectedItem is ImageDownloadItem item)
-   CancelSingleDownload(item);
-        }
-
-        private void CancelSingleDownload(ImageDownloadItem item)
-    {
-     if (item.Status == STATUS_DOWNLOADING || item.Status == STATUS_CHECKING || item.Status == STATUS_FINDING_FULLRES)
+            else
             {
-  item.Status = STATUS_CANCELLED;
- item.ErrorMessage = "Canceled by user";
-       _uiStateManager!.UpdateStatus($"Canceled download: {item.FileName}");
-    }
-       else
-            {
-        ShowInfo($"Cannot cancel - item is not currently downloading.\nCurrent status: {item.Status}", "Cannot Cancel");
-       }
+   _currentPage = 1;
         }
 
- protected override void OnClosing(CancelEventArgs e)
-   {
-     _cancellationTokenSource?.Cancel();
-            base.OnClosing(e);
+         UpdatePagination();
         }
+
+        protected override void OnClosing(CancelEventArgs e)
+     {
+            _cancellationTokenSource?.Cancel();
+       base.OnClosing(e);
+      }
 
         private void BrowseButton_Click(object sender, RoutedEventArgs e)
    {
-            string initialDir = GetValidInitialDirectory(_downloadFolder);
-          var dialog = new OpenFolderDialog { Title = "Select Download Folder", InitialDirectory = initialDir };
+  string initialDir = GetValidInitialDirectory(_downloadFolder);
+            var dialog = new OpenFolderDialog { Title = "Select Download Folder", InitialDirectory = initialDir };
 
-        if (dialog.ShowDialog() == true)
-    {
-   _downloadFolder = dialog.FolderName;
-             FolderTextBox.Text = _downloadFolder;
-           _settings.SaveToPortableSettings(_downloadFolder, UrlTextBox.Text);
-  InitializeServices();
-    }
+            if (dialog.ShowDialog() == true)
+            {
+ _downloadFolder = dialog.FolderName;
+        FolderTextBox.Text = _downloadFolder;
+            _settings.SaveToPortableSettings(_downloadFolder, UrlTextBox.Text);
+        InitializeServices();
+            }
         }
 
-        private string GetValidInitialDirectory(string folder)
-   {
-       if (Directory.Exists(folder)) return folder;
+    private string GetValidInitialDirectory(string folder)
+        {
+        if (Directory.Exists(folder)) return folder;
             var parentDir = IOPath.GetDirectoryName(folder);
-       if (!string.IsNullOrEmpty(parentDir) && Directory.Exists(parentDir)) return parentDir;
-       return Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
-      }
+            if (!string.IsNullOrEmpty(parentDir) && Directory.Exists(parentDir)) return parentDir;
+     return Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+        }
 
-        private void UpFolderButton_Click(object sender, RoutedEventArgs e)
+    private void UpFolderButton_Click(object sender, RoutedEventArgs e)
         {
-      try
-      {
-  var parentDir = IOPath.GetDirectoryName(_downloadFolder);
-         if (!string.IsNullOrEmpty(parentDir) && Directory.Exists(parentDir))
-{
-     _downloadFolder = parentDir;
-     FolderTextBox.Text = _downloadFolder;
-          _settings.SaveToPortableSettings(_downloadFolder, UrlTextBox.Text);
-      _uiStateManager!.UpdateStatus($"Navigated up to: {_downloadFolder}");
-           InitializeServices();
-           }
-            else
+       try
+        {
+      var parentDir = IOPath.GetDirectoryName(_downloadFolder);
+       if (!string.IsNullOrEmpty(parentDir) && Directory.Exists(parentDir))
+    {
+       _downloadFolder = parentDir;
+FolderTextBox.Text = _downloadFolder;
+            _settings.SaveToPortableSettings(_downloadFolder, UrlTextBox.Text);
+       _uiStateManager!.UpdateStatus($"Navigated up to: {_downloadFolder}");
+   InitializeServices();
+       }
+  else
          {
-    ShowInfo("Cannot navigate up - already at root directory.", "Cannot Go Up");
-   }
+      ShowInfo("Cannot navigate up - already at root directory.", "Cannot Go Up");
+           }
             }
-            catch (Exception ex)
-        {
-        ShowError($"Failed to navigate up: {ex.Message}", "Error Navigating");
-    }
+      catch (Exception ex)
+            {
+                ShowError($"Failed to navigate up: {ex.Message}", "Error Navigating");
+}
         }
 
         private void NewFolderButton_Click(object sender, RoutedEventArgs e)
-        {
+ {
        try
-            {
-            string parentDir = Directory.Exists(_downloadFolder) 
-? _downloadFolder 
-   : IOPath.GetDirectoryName(_downloadFolder) ?? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+          {
+  string parentDir = Directory.Exists(_downloadFolder) 
+          ? _downloadFolder 
+          : IOPath.GetDirectoryName(_downloadFolder) ?? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
 
-                string newFolderPath = GenerateUniqueFolderPath(parentDir, "New Folder");
-         Directory.CreateDirectory(newFolderPath);
+          string newFolderPath = GenerateUniqueFolderPath(parentDir, "New Folder");
+             Directory.CreateDirectory(newFolderPath);
 
-                var finalName = PromptForFolderName(IOPath.GetFileName(newFolderPath));
-       if (finalName != null)
-   {
+   var finalName = PromptForFolderName(IOPath.GetFileName(newFolderPath));
+  if (finalName != null)
+    {
             if (finalName != IOPath.GetFileName(newFolderPath))
-   {
-       string finalPath = IOPath.Combine(parentDir, finalName);
-      if (Directory.Exists(finalPath))
+           {
+      string finalPath = IOPath.Combine(parentDir, finalName);
+     if (Directory.Exists(finalPath))
 {
-    ShowWarning($"A folder named '{finalName}' already exists.", "Name Conflict");
-    Directory.Delete(newFolderPath);
-      return;
-            }
+     ShowWarning($"A folder named '{finalName}' already exists.", "Name Conflict");
+                Directory.Delete(newFolderPath);
+          return;
+   }
      Directory.Move(newFolderPath, finalPath);
-      newFolderPath = finalPath;
-          }
+                newFolderPath = finalPath;
+       }
 
-        _downloadFolder = newFolderPath;
-           FolderTextBox.Text = _downloadFolder;
-   _settings.SaveToPortableSettings(_downloadFolder, UrlTextBox.Text);
-       _uiStateManager!.UpdateStatus($"New folder created: {finalName}");
-         InitializeServices();
-     }
-       else
-      {
- Directory.Delete(newFolderPath);
+    _downloadFolder = newFolderPath;
+          FolderTextBox.Text = _downloadFolder;
+     _settings.SaveToPortableSettings(_downloadFolder, UrlTextBox.Text);
+             _uiStateManager!.UpdateStatus($"New folder created: {finalName}");
+        InitializeServices();
         }
-            }
-      catch (Exception ex)
-      {
-        ShowError($"Error creating folder: {ex.Message}");
-            }
-        }
-
-        private string GenerateUniqueFolderPath(string parentDir, string baseName)
+        else
   {
-  string path = IOPath.Combine(parentDir, baseName);
-     int counter = 1;
-   while (Directory.Exists(path))
+        Directory.Delete(newFolderPath);
+  }
+            }
+   catch (Exception ex)
             {
- path = IOPath.Combine(parentDir, $"{baseName} ({counter})");
-counter++;
+   ShowError($"Error creating folder: {ex.Message}");
+     }
         }
-            return path;
+
+      private string GenerateUniqueFolderPath(string parentDir, string baseName)
+      {
+   string path = IOPath.Combine(parentDir, baseName);
+   int counter = 1;
+  while (Directory.Exists(path))
+            {
+       path = IOPath.Combine(parentDir, $"{baseName} ({counter})");
+  counter++;
+            }
+   return path;
         }
 
         private string? PromptForFolderName(string defaultName)
         {
-          var inputDialog = new Window
-  {
-         Title = "Name New Folder",
-                Width = 400,
-         Height = 180,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-    Owner = this,
-          ResizeMode = ResizeMode.NoResize
-  };
+     var inputDialog = new Window
+    {
+    Title = "Name New Folder",
+    Width = 400,
+       Height = 180,
+           WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Owner = this,
+              ResizeMode = ResizeMode.NoResize
+            };
 
      var grid = new Grid { Margin = new Thickness(15) };
-     grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-       grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-      grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+      grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-   var label = new TextBlock { Text = "Folder name:", Margin = new Thickness(0, 0, 0, 10), VerticalAlignment = VerticalAlignment.Top };
-         Grid.SetRow(label, 0);
+            var label = new TextBlock { Text = "Folder name:", Margin = new Thickness(0, 0, 0, 10), VerticalAlignment = VerticalAlignment.Top };
+     Grid.SetRow(label, 0);
 
-            var textBox = new TextBox { Text = defaultName, Height = 30, VerticalContentAlignment = VerticalAlignment.Center, Padding = new Thickness(5), Margin = new Thickness(0, 0, 0, 10) };
-    textBox.SelectAll();
-            Grid.SetRow(textBox, 1);
-          Grid.SetRow(new FrameworkElement(), 2);
+        var textBox = new TextBox { Text = defaultName, Height = 30, VerticalContentAlignment = VerticalAlignment.Center, Padding = new Thickness(5), Margin = new Thickness(0, 0, 0, 10) };
+  textBox.SelectAll();
+         Grid.SetRow(textBox, 1);
+            Grid.SetRow(new FrameworkElement(), 2);
 
-      var buttonPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
-     Grid.SetRow(buttonPanel, 3);
+    var buttonPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
+            Grid.SetRow(buttonPanel, 3);
 
-      var okButton = new Button { Content = "OK", Width = 80, Height = 30, Margin = new Thickness(0, 0, 10, 0), IsDefault = true };
-    okButton.Click += (s, args) => { inputDialog.DialogResult = true; inputDialog.Close(); };
+            var okButton = new Button { Content = "OK", Width = 80, Height = 30, Margin = new Thickness(0, 0, 10, 0), IsDefault = true };
+      okButton.Click += (s, args) => { inputDialog.DialogResult = true; inputDialog.Close(); };
 
             var cancelButton = new Button { Content = "Cancel", Width = 80, Height = 30, IsCancel = true };
-            cancelButton.Click += (s, args) => { inputDialog.DialogResult = false; inputDialog.Close(); };
+       cancelButton.Click += (s, args) => { inputDialog.DialogResult = false; inputDialog.Close(); };
 
-buttonPanel.Children.Add(okButton);
-    buttonPanel.Children.Add(cancelButton);
-grid.Children.Add(label);
- grid.Children.Add(textBox);
-        grid.Children.Add(buttonPanel);
-          inputDialog.Content = grid;
-      inputDialog.Loaded += (s, args) => textBox.Focus();
+      buttonPanel.Children.Add(okButton);
+  buttonPanel.Children.Add(cancelButton);
+ grid.Children.Add(label);
+         grid.Children.Add(textBox);
+            grid.Children.Add(buttonPanel);
+         inputDialog.Content = grid;
+ inputDialog.Loaded += (s, args) => textBox.Focus();
 
             if (inputDialog.ShowDialog() == true)
-      {
-   string finalName = textBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(finalName))
-{
-         ShowWarning("Folder name cannot be empty.", "Invalid Name");
-          return null;
-        }
+            {
+     string finalName = textBox.Text.Trim();
+       if (string.IsNullOrWhiteSpace(finalName))
+            {
+             ShowWarning("Folder name cannot be empty.", "Invalid Name");
+  return null;
+    }
 
-     if (finalName.IndexOfAny(IOPath.GetInvalidFileNameChars()) >= 0)
-       {
-         ShowWarning("Folder name contains invalid characters.", "Invalid Name");
-              return null;
-  }
+           if (finalName.IndexOfAny(IOPath.GetInvalidFileNameChars()) >= 0)
+      {
+       ShowWarning("Folder name contains invalid characters.", "Invalid Name");
+     return null;
+                }
 
          return finalName;
-        }
-
-       return null;
     }
 
-      private void OpenFolderButton_Click(object sender, RoutedEventArgs e)
+ return null;
+        }
+
+   private void OpenFolderButton_Click(object sender, RoutedEventArgs e)
         {
             try
-            {
-       if (!Directory.Exists(_downloadFolder))
+      {
+    if (!Directory.Exists(_downloadFolder))
          Directory.CreateDirectory(_downloadFolder);
 
-       System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-     {
-        FileName = _downloadFolder,
-   UseShellExecute = true,
-        Verb = "open"
-    });
-         
-         _uiStateManager!.UpdateStatus($"Opened folder: {_downloadFolder}");
-    }
-catch (Exception ex)
-      {
-             ShowError($"Failed to open folder: {ex.Message}", "Error Opening Folder");
-            }
-   }
+     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+    {
+  FileName = _downloadFolder,
+         UseShellExecute = true,
+            Verb = "open"
+  });
 
-        private void SettingsButton_Click(object sender, RoutedEventArgs e)
-        {
-        var settingsWindow = new SettingsWindow(_settings);
-if (settingsWindow.ShowDialog() == true)
+   _uiStateManager!.UpdateStatus($"Opened folder: {_downloadFolder}");
+    }
+   catch (Exception ex)
             {
-                _settings.SaveToPortableSettings(_downloadFolder, UrlTextBox.Text);
-         if (_itemsPerPage != _settings.ItemsPerPage)
-     {
-  _itemsPerPage = _settings.ItemsPerPage;
-    _currentPage = 1;
-        UpdatePagination();
-                }
-      InitializeServices();
-  _uiStateManager!.UpdateStatus("Settings saved.");
-            }
+      ShowError($"Failed to open folder: {ex.Message}", "Error Opening Folder");
+   }
         }
 
-        private void UpdatePagination()
-        {
-     _totalPages = (int)Math.Ceiling((double)_filteredImageItems.Count / _itemsPerPage);
-      if (_totalPages == 0) _totalPages = 1;
-            if (_currentPage > _totalPages) _currentPage = _totalPages;
-         if (_currentPage < 1) _currentPage = 1;
+  private void SettingsButton_Click(object sender, RoutedEventArgs e)
+  {
+            var settingsWindow = new SettingsWindow(_settings);
+      if (settingsWindow.ShowDialog() == true)
+  {
+       _settings.SaveToPortableSettings(_downloadFolder, UrlTextBox.Text);
+     if (_itemsPerPage != _settings.ItemsPerPage)
+  {
+         _itemsPerPage = _settings.ItemsPerPage;
+     _currentPage = 1;
+         UpdatePagination();
+     }
+           InitializeServices();
+      _uiStateManager!.UpdateStatus("Settings saved.");
+    }
+     }
 
-     PageInfoText.Text = $"Page {_currentPage} of {_totalPages} ({_filteredImageItems.Count} filtered / {_imageItems.Count} total images)";
-            PrevPageButton.IsEnabled = _currentPage > 1;
-    NextPageButton.IsEnabled = _currentPage < _totalPages;
-     
-       // Update the pagination context on the ListView to avoid repeated tree traversals in the converter
-        UpdateListViewPaginationContext();
-    
-LoadCurrentPage();
+      private void UpdatePagination()
+        {
+_totalPages = (int)Math.Ceiling((double)_filteredImageItems.Count / _itemsPerPage);
+            if (_totalPages == 0) _totalPages = 1;
+      if (_currentPage > _totalPages) _currentPage = _totalPages;
+      if (_currentPage < 1) _currentPage = 1;
+
+ PageInfoText.Text = $"Page {_currentPage} of {_totalPages} ({_filteredImageItems.Count} filtered / {_imageItems.Count} total images)";
+       PrevPageButton.IsEnabled = _currentPage > 1;
+NextPageButton.IsEnabled = _currentPage < _totalPages;
+
+         // Update the pagination context on the ListView to avoid repeated tree traversals in the converter
+            UpdateListViewPaginationContext();
+
+         LoadCurrentPage();
         }
 
         /// <summary>
-     /// Updates the cached pagination context on the ListView for optimal index converter performance.
-      /// </summary>
-     private void UpdateListViewPaginationContext()
+        /// Updates the cached pagination context on the ListView for optimal index converter performance.
+  /// </summary>
+  private void UpdateListViewPaginationContext()
         {
             var paginationContext = new PaginationContext
-          {
-         CurrentPage = _currentPage,
-                ItemsPerPage = _itemsPerPage
-    };
-        
+ {
+                CurrentPage = _currentPage,
+  ItemsPerPage = _itemsPerPage
+            };
+
             ListViewHelper.SetPaginationContext(ImageList, paginationContext);
-  }
-
-        private void LoadCurrentPage()
-   {
-            _currentPageItems.Clear();
-            int startIndex = (_currentPage - 1) * _itemsPerPage;
-         int endIndex = Math.Min(startIndex + _itemsPerPage, _filteredImageItems.Count);
-
- for (int i = startIndex; i < endIndex; i++)
-         _currentPageItems.Add(_filteredImageItems[i]);
         }
 
-        private void ImageItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        private void LoadCurrentPage()
         {
-if (e.PropertyName == nameof(ImageDownloadItem.Status))
-                ApplyStatusFilter();
+    _currentPageItems.Clear();
+         int startIndex = (_currentPage - 1) * _itemsPerPage;
+  int endIndex = Math.Min(startIndex + _itemsPerPage, _filteredImageItems.Count);
+
+         for (int i = startIndex; i < endIndex; i++)
+                _currentPageItems.Add(_filteredImageItems[i]);
   }
+
+     private void ImageItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+    if (e.PropertyName == nameof(ImageDownloadItem.Status))
+                ApplyStatusFilter();
+        }
 
         private void StatusFilter_Changed(object sender, RoutedEventArgs e) => ApplyStatusFilter();
 
         private void SelectAllStatus_Click(object sender, RoutedEventArgs e)
-    {
-   FilterReadyCheckBox.IsChecked = FilterDoneCheckBox.IsChecked = FilterBackupCheckBox.IsChecked = 
-     FilterDuplicateCheckBox.IsChecked = FilterFailedCheckBox.IsChecked = FilterSkippedCheckBox.IsChecked = 
-       FilterCancelledCheckBox.IsChecked = FilterDownloadingCheckBox.IsChecked = true;
+        {
+            FilterReadyCheckBox.IsChecked = FilterDoneCheckBox.IsChecked = FilterBackupCheckBox.IsChecked = 
+        FilterDuplicateCheckBox.IsChecked = FilterFailedCheckBox.IsChecked = FilterSkippedCheckBox.IsChecked = 
+         FilterCancelledCheckBox.IsChecked = FilterDownloadingCheckBox.IsChecked = true;
      }
 
-        private void ClearAllStatus_Click(object sender, RoutedEventArgs e)
+ private void ClearAllStatus_Click(object sender, RoutedEventArgs e)
         {
-         FilterReadyCheckBox.IsChecked = FilterDoneCheckBox.IsChecked = FilterBackupCheckBox.IsChecked = 
-   FilterDuplicateCheckBox.IsChecked = FilterFailedCheckBox.IsChecked = FilterSkippedCheckBox.IsChecked = 
-            FilterCancelledCheckBox.IsChecked = FilterDownloadingCheckBox.IsChecked = false;
+       FilterReadyCheckBox.IsChecked = FilterDoneCheckBox.IsChecked = FilterBackupCheckBox.IsChecked = 
+           FilterDuplicateCheckBox.IsChecked = FilterFailedCheckBox.IsChecked = FilterSkippedCheckBox.IsChecked = 
+    FilterCancelledCheckBox.IsChecked = FilterDownloadingCheckBox.IsChecked = false;
         }
 
-private void ApplyStatusFilter()
+ private async void ContextMenu_ReloadPreview_Click(object sender, RoutedEventArgs e)
         {
-  if (FilterReadyCheckBox == null || _filteredImageItems == null || _imageItems == null)
-  return;
+      if (ImageList.SelectedItem is ImageDownloadItem item)
+  await ReloadSinglePreviewAsync(item);
+        }
 
-     ImageDownloadItem? firstVisibleItem = _currentPageItems.Count > 0 ? _currentPageItems[0] : null;
-    _filteredImageItems.Clear();
+        private async Task ReloadSinglePreviewAsync(ImageDownloadItem item)
+        {
+            if (!_settings.LoadPreviews)
+  {
+      ShowInfo("Preview loading is disabled in Settings. Please enable 'Load preview images during scan' to use this feature.", "Preview Loading Disabled");
+           return;
+       }
 
- foreach (var item in _imageItems)
-            {
-        bool include = (FilterReadyCheckBox.IsChecked.GetValueOrDefault() && item.Status == STATUS_READY) ||
-               (FilterDoneCheckBox.IsChecked.GetValueOrDefault() && item.Status == STATUS_DONE) ||
-             (FilterBackupCheckBox.IsChecked.GetValueOrDefault() && item.Status == STATUS_BACKUP) ||
-       (FilterDuplicateCheckBox.IsChecked.GetValueOrDefault() && item.Status == STATUS_DUPLICATE) ||
-       (FilterFailedCheckBox.IsChecked.GetValueOrDefault() && item.Status == STATUS_FAILED) ||
-             (FilterSkippedCheckBox.IsChecked.GetValueOrDefault() && item.Status.Contains(STATUS_SKIPPED)) ||
-     (FilterCancelledCheckBox.IsChecked.GetValueOrDefault() && item.Status == STATUS_CANCELLED) ||
- (FilterDownloadingCheckBox.IsChecked.GetValueOrDefault() && 
-     (item.Status == STATUS_DOWNLOADING || item.Status == STATUS_CHECKING || item.Status == STATUS_FINDING_FULLRES));
+   try
+      {
+     _uiStateManager!.UpdateStatus($"Reloading preview for {item.FileName}...");
+ item.PreviewImage = null;
 
- if (include)
-       _filteredImageItems.Add(item);
+            var newPreview = await _previewLoader!.LoadPreviewImageFromColumnWidthAsync(item.Url, PreviewColumn.ActualWidth);
+     if (newPreview != null)
+    {
+         item.PreviewImage = newPreview;
+              _uiStateManager.UpdateStatus($"Preview reloaded for {item.FileName}");
+    }
+                else
+       {
+       _uiStateManager.UpdateStatus($"Failed to reload preview for {item.FileName}");
+        ShowWarning($"Failed to reload preview for {item.FileName}. The image URL may be invalid or unavailable.", "Preview Load Failed");
+  }
  }
-
-  if (firstVisibleItem != null)
-            {
-    int newIndex = _filteredImageItems.IndexOf(firstVisibleItem);
-      if (newIndex >= 0)
-        _currentPage = (newIndex / _itemsPerPage) + 1;
-            }
-      else
-            {
-     _currentPage = 1;
+     catch (Exception ex)
+     {
+      _uiStateManager!.UpdateStatus($"Error reloading preview: {ex.Message}");
+     ShowError($"Error reloading preview: {ex.Message}", "Preview Error");
+      }
         }
 
-        UpdatePagination();
-   }
+    private void ContextMenu_Cancel_Click(object sender, RoutedEventArgs e)
+        {
+   if (ImageList.SelectedItem is ImageDownloadItem item)
+                CancelSingleDownload(item);
+  }
 
         private void PrevPageButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_currentPage > 1)
-            {
-                _currentPage--;
-       UpdatePagination();
-        }
+   if (_currentPage > 1)
+{
+        _currentPage--;
+   UpdatePagination();
+  }
         }
 
         private void NextPageButton_Click(object sender, RoutedEventArgs e)
         {
-       if (_currentPage < _totalPages)
-            {
-  _currentPage++;
-       UpdatePagination();
- }
+   if (_currentPage < _totalPages)
+ {
+    _currentPage++;
+UpdatePagination();
+            }
         }
 
-        // Helper methods for MessageBox calls
+  // Helper methods for MessageBox calls
         private void ShowInfo(string message, string title = "Info") => 
       MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Information);
 
         private void ShowWarning(string message, string title = "Warning") => 
-    MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Warning);
+        MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Warning);
 
-private void ShowError(string message, string title = "Error") => 
+        private void ShowError(string message, string title = "Error") => 
             MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Error);
     }
 }

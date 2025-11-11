@@ -1,20 +1,15 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using WebsiteImagePilfer.Constants;
+using WebsiteImagePilfer.Services;
+using static WebsiteImagePilfer.Constants.AppConstants;
 
 namespace WebsiteImagePilfer
 {
     public class PortableSettingsManager
     {
-        private const string SETTINGS_FILE_NAME = "settings.json";
-        private const int MIN_IMAGE_SIZE = 100;
-        private const int MAX_IMAGE_SIZE = 1_000_000_000;
-        private const int MIN_ITEMS_PER_PAGE = 1;
-        private const int MAX_ITEMS_PER_PAGE = 1000;
-        private const int MIN_MAX_IMAGES_TO_SCAN = 1;
-        private const int MAX_MAX_IMAGES_TO_SCAN = 10000;
-
-        private static string SettingsFilePath => Path.Combine(AppContext.BaseDirectory, SETTINGS_FILE_NAME);
+        private static string SettingsFilePath => Path.Combine(AppContext.BaseDirectory, Settings.FileName);
 
         public class AppSettings
         {
@@ -33,21 +28,21 @@ namespace WebsiteImagePilfer
 
             public bool IsValid(out string? validationError)
             {
-                if (MinimumImageSize < MIN_IMAGE_SIZE || MinimumImageSize > MAX_IMAGE_SIZE)
+                if (MinimumImageSize < Validation.MinImageSize || MinimumImageSize > Validation.MaxImageSize)
                 {
-                    validationError = $"MinimumImageSize must be between {MIN_IMAGE_SIZE} and {MAX_IMAGE_SIZE}";
+                    validationError = $"MinimumImageSize must be between {Validation.MinImageSize} and {Validation.MaxImageSize}";
                     return false;
                 }
 
-                if (ItemsPerPage < MIN_ITEMS_PER_PAGE || ItemsPerPage > MAX_ITEMS_PER_PAGE)
+                if (ItemsPerPage < Validation.MinItemsPerPage || ItemsPerPage > Validation.MaxItemsPerPage)
                 {
-                    validationError = $"ItemsPerPage must be between {MIN_ITEMS_PER_PAGE} and {MAX_ITEMS_PER_PAGE}";
+                    validationError = $"ItemsPerPage must be between {Validation.MinItemsPerPage} and {Validation.MaxItemsPerPage}";
                     return false;
                 }
 
-                if (MaxImagesToScan < MIN_MAX_IMAGES_TO_SCAN || MaxImagesToScan > MAX_MAX_IMAGES_TO_SCAN)
+                if (MaxImagesToScan < Validation.MinMaxImagesToScan || MaxImagesToScan > Validation.MaxMaxImagesToScan)
                 {
-                    validationError = $"MaxImagesToScan must be between {MIN_MAX_IMAGES_TO_SCAN} and {MAX_MAX_IMAGES_TO_SCAN}";
+                    validationError = $"MaxImagesToScan must be between {Validation.MinMaxImagesToScan} and {Validation.MaxMaxImagesToScan}";
                     return false;
                 }
 
@@ -63,9 +58,9 @@ namespace WebsiteImagePilfer
 
             public void ApplySafeDefaults()
             {
-                MinimumImageSize = Math.Clamp(MinimumImageSize, MIN_IMAGE_SIZE, MAX_IMAGE_SIZE);
-                ItemsPerPage = Math.Clamp(ItemsPerPage, MIN_ITEMS_PER_PAGE, MAX_ITEMS_PER_PAGE);
-                MaxImagesToScan = Math.Clamp(MaxImagesToScan, MIN_MAX_IMAGES_TO_SCAN, MAX_MAX_IMAGES_TO_SCAN);
+                MinimumImageSize = Math.Clamp(MinimumImageSize, Validation.MinImageSize, Validation.MaxImageSize);
+                ItemsPerPage = Math.Clamp(ItemsPerPage, Validation.MinItemsPerPage, Validation.MaxItemsPerPage);
+                MaxImagesToScan = Math.Clamp(MaxImagesToScan, Validation.MinMaxImagesToScan, Validation.MaxMaxImagesToScan);
 
                 if (FilterJpgOnly && FilterPngOnly)
                 {
@@ -81,7 +76,7 @@ namespace WebsiteImagePilfer
             {
                 if (!File.Exists(SettingsFilePath))
                 {
-                    System.Diagnostics.Debug.WriteLine($"Settings file not found at {SettingsFilePath}, returning defaults");
+                    Logger.Info($"Settings file not found at {SettingsFilePath}, returning defaults");
                     return new AppSettings();
                 }
 
@@ -90,38 +85,38 @@ namespace WebsiteImagePilfer
 
                 if (settings == null)
                 {
-                    System.Diagnostics.Debug.WriteLine("Failed to deserialize settings, returning defaults");
+                    Logger.Warning("Failed to deserialize settings, returning defaults");
                     return new AppSettings();
                 }
 
                 // Validate and apply safe defaults if needed
                 if (!settings.IsValid(out string? validationError))
                 {
-                    System.Diagnostics.Debug.WriteLine($"Settings validation failed: {validationError}. Applying safe defaults.");
+                    Logger.Warning($"Settings validation failed: {validationError}. Applying safe defaults.");
                     settings.ApplySafeDefaults();
                 }
 
-                System.Diagnostics.Debug.WriteLine($"Settings loaded successfully from {SettingsFilePath}");
+                Logger.Info($"Settings loaded successfully from {SettingsFilePath}");
                 return settings;
             }
             catch (JsonException ex)
             {
-                System.Diagnostics.Debug.WriteLine($"JSON parsing error loading settings: {ex.Message}");
+                Logger.Error("JSON parsing error loading settings", ex);
                 return new AppSettings();
             }
             catch (IOException ex)
             {
-                System.Diagnostics.Debug.WriteLine($"IO error loading settings: {ex.Message}");
+                Logger.Error("IO error loading settings", ex);
                 return new AppSettings();
             }
             catch (UnauthorizedAccessException ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Access denied loading settings: {ex.Message}");
+                Logger.Error("Access denied loading settings", ex);
                 return new AppSettings();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Unexpected error loading settings: {ex.GetType().Name} - {ex.Message}");
+                Logger.Error("Unexpected error loading settings", ex);
                 return new AppSettings();
             }
         }
@@ -130,16 +125,16 @@ namespace WebsiteImagePilfer
         {
             if (settings == null)
             {
-                System.Diagnostics.Debug.WriteLine("Cannot save null settings");
+                Logger.Warning("Cannot save null settings");
                 return false;
             }
 
             // Validate settings before saving
             if (!settings.IsValid(out string? validationError))
             {
-                System.Diagnostics.Debug.WriteLine($"Cannot save invalid settings: {validationError}");
+                Logger.Warning($"Cannot save invalid settings: {validationError}");
                 settings.ApplySafeDefaults();
-                System.Diagnostics.Debug.WriteLine("Safe defaults applied, continuing with save");
+                Logger.Info("Safe defaults applied, continuing with save");
             }
 
             try
@@ -147,27 +142,27 @@ namespace WebsiteImagePilfer
                 var options = new JsonSerializerOptions { WriteIndented = true };
                 string json = JsonSerializer.Serialize(settings, options);
                 File.WriteAllText(SettingsFilePath, json);
-                System.Diagnostics.Debug.WriteLine($"Settings saved successfully to {SettingsFilePath}");
+                Logger.Info($"Settings saved successfully to {SettingsFilePath}");
                 return true;
             }
             catch (JsonException ex)
             {
-                System.Diagnostics.Debug.WriteLine($"JSON serialization error saving settings: {ex.Message}");
+                Logger.Error("JSON serialization error saving settings", ex);
                 return false;
             }
             catch (IOException ex)
             {
-                System.Diagnostics.Debug.WriteLine($"IO error saving settings: {ex.Message}");
+                Logger.Error("IO error saving settings", ex);
                 return false;
             }
             catch (UnauthorizedAccessException ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Access denied saving settings: {ex.Message}");
+                Logger.Error("Access denied saving settings", ex);
                 return false;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Unexpected error saving settings: {ex.GetType().Name} - {ex.Message}");
+                Logger.Error("Unexpected error saving settings", ex);
                 return false;
             }
         }
@@ -183,14 +178,14 @@ namespace WebsiteImagePilfer
                 if (File.Exists(SettingsFilePath))
                 {
                     File.Delete(SettingsFilePath);
-                    System.Diagnostics.Debug.WriteLine($"Settings file deleted: {SettingsFilePath}");
+                    Logger.Info($"Settings file deleted: {SettingsFilePath}");
                     return true;
                 }
                 return false;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error deleting settings: {ex.Message}");
+                Logger.Error("Error deleting settings", ex);
                 return false;
             }
         }

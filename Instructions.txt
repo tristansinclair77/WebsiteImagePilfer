@@ -1,258 +1,756 @@
-﻿# Task #9: Optimize ListViewIndexConverter.cs
+﻿# Task #11: Cross-Cutting Concerns - Partial Improvements
 
-## Current Issues Identified:
+## Overview
+Cross-cutting concerns are aspects of software that affect multiple parts of the application. Currently, the codebase has several areas where common functionality is scattered and should be centralized.
 
-### 1. **ENCAPSULATION VIOLATION** (Critical Issue)
-**Problem:**
+---
+
+## 1. LOGGING INFRASTRUCTURE 🔍
+
+### Current State: Debug.WriteLine Scattered Everywhere
+
+**Problem Locations:**
 ```csharp
-int globalIndex = ((mainWindow._currentPage - 1) * mainWindow._itemsPerPage) + localIndex + 1;
+// Found in 5+ files:
+System.Diagnostics.Debug.WriteLine($"Failed to reload preview for {item.Url}: {ex.Message}");
+System.Diagnostics.Debug.WriteLine($"Failed to load preview for {item.Url}: {ex.Message}");
+System.Diagnostics.Debug.WriteLine($"Downloaded {item.FileName} in {totalElapsed}ms");
+System.Diagnostics.Debug.WriteLine($"HTTP error for {item.FileName}: {ex.Message}");
+System.Diagnostics.Debug.WriteLine($"Kemono.cr preview detected, transforming to full-res URL");
+System.Diagnostics.Debug.WriteLine($"Settings loaded successfully from {SettingsFilePath}");
+// ... 20+ more instances
 ```
 
-The converter directly accesses **public fields** on MainWindow:
-- `mainWindow._currentPage`
-- `mainWindow._itemsPerPage`
+**Issues:**
+- ❌ No log levels (Info, Warning, Error, Debug)
+- ❌ Only visible in debugger (not in production)
+- ❌ No log file output
+- ❌ Can't filter by component or severity
+- ❌ No timestamp information
+- ❌ No structured logging
+- ❌ Performance impact (string interpolation always executed)
+- ❌ Can't disable in production
+- ❌ No centralized log viewing
 
-**Why This Is Bad:**
-- Violates encapsulation principles (fields should be private)
-- Tight coupling between converter and MainWindow implementation
-- Breaks OOP best practices (exposing internal state)
-- Changes to MainWindow field names break the converter
-- Cannot be unit tested without MainWindow instance
-- Other code could also directly modify these fields (dangerous)
+**Impact:**
+- Difficult to diagnose production issues
+- No audit trail
+- Can't analyze usage patterns
+- Poor troubleshooting experience
 
-**Current State in MainWindow.xaml.cs:**
+---
+
+### Proposed Solution: Centralized Logging Service
+
+#### Option A: Simple Custom Logger (Recommended for now)
 ```csharp
-public int _currentPage = 1;      // PUBLIC FIELD - BAD!
-public int _itemsPerPage = 50;     // PUBLIC FIELD - BAD!
-```
-
-### 2. **REPEATED PARENT FINDING LOGIC**
-**Problem:**
-```csharp
-private static T? FindParent<T>(DependencyObject child) where T : DependencyObject
+public static class Logger
 {
-    DependencyObject parentObject = VisualTreeHelper.GetParent(child);
-    if (parentObject == null) return null;
+    public enum LogLevel { Debug, Info, Warning, Error }
+  
+    private static readonly string LogFilePath = Path.Combine(
+     AppContext.BaseDirectory, "logs", $"app_{DateTime.Now:yyyyMMdd}.log");
     
-    if (parentObject is T parent)
-        return parent;
-    else
-        return FindParent<T>(parentObject);
+  public static void Log(LogLevel level, string message, string? source = null, Exception? ex = null)
+{
+        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+     var logEntry = $"[{timestamp}] [{level}] [{source ?? "App"}] {message}";
+     
+        if (ex != null)
+   logEntry += $"\n  Exception: {ex.GetType().Name}: {ex.Message}\n  {ex.StackTrace}";
+        
+    // Write to debug output
+        System.Diagnostics.Debug.WriteLine(logEntry);
+        
+        // Write to file (async, fire-and-forget)
+        Task.Run(() => WriteToFileAsync(logEntry));
+    }
+    
+    public static void Debug(string message, [CallerMemberName] string? source = null)
+   => Log(LogLevel.Debug, message, source);
+    
+    public static void Info(string message, [CallerMemberName] string? source = null)
+        => Log(LogLevel.Info, message, source);
+    
+  public static void Warning(string message, [CallerMemberName] string? source = null)
+        => Log(LogLevel.Warning, message, source);
+    
+    public static void Error(string message, Exception? ex = null, [CallerMemberName] string? source = null)
+        => Log(LogLevel.Error, message, source, ex);
+}
+```
+
+**Benefits:**
+- ✅ Log levels for filtering
+- ✅ File output for production debugging
+- ✅ Automatic source tracking with CallerMemberName
+- ✅ Exception details captured
+- ✅ Daily log rotation
+- ✅ Timestamp on every entry
+- ✅ Zero external dependencies
+
+#### Option B: Use Serilog (Best for production apps)
+```csharp
+// Install-Package Serilog.Sinks.File
+// Install-Package Serilog.Sinks.Debug
+
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
+    .WriteTo.Debug()
+    .WriteTo.File("logs/app.log", rollingInterval: RollingInterval.Day)
+    .CreateLogger();
+
+// Usage:
+Log.Information("Downloaded {FileName} in {ElapsedMs}ms", fileName, elapsed);
+Log.Error(ex, "Failed to download {Url}", url);
+```
+
+**Benefits:**
+- ✅ Industry standard
+- ✅ Structured logging
+- ✅ Many sinks (file, database, cloud)
+- ✅ High performance
+- ✅ Rich ecosystem
+
+**Migration Plan:**
+1. Create Logger static class
+2. Replace Debug.WriteLine calls gradually
+3. Add to all service classes
+4. Consider Serilog later if needed
+
+---
+
+## 2. DEPENDENCY INJECTION 💉
+
+### Current State: Manual 'new' Everywhere
+
+**Problem Locations:**
+```csharp
+// MainWindow.xaml.cs - line 80+
+_httpClient = new HttpClient();
+_imageScanner = new ImageScanner(status => ...);
+_imageDownloader = new ImageDownloader(_httpClient, _settings, _downloadFolder);
+_previewLoader = new ImagePreviewLoader(_httpClient);
+_uiStateManager = new UIStateManager(ScanOnlyButton, ...);
+
+// SettingsWindow.xaml.cs
+var settingsWindow = new SettingsWindow(_settings);
+
+// ImageDownloader.cs - ImageScanner.cs - etc.
+// All services created with 'new' keyword
+```
+
+**Issues:**
+- ❌ Tight coupling between classes
+- ❌ Difficult to unit test (can't mock dependencies)
+- ❌ HttpClient shared but created manually
+- ❌ Service lifetimes not managed
+- ❌ Circular dependency risks
+- ❌ No interface-based programming
+- ❌ Hard to swap implementations
+- ❌ Violates Dependency Inversion Principle
+
+**Impact:**
+- Cannot unit test services in isolation
+- HttpClient not disposed properly
+- Services recreated unnecessarily
+- Hard to maintain and extend
+
+---
+
+### Proposed Solution: Simple Service Locator Pattern
+
+#### Phase 1: Service Container (No external dependencies)
+```csharp
+public static class ServiceContainer
+{
+    private static readonly Dictionary<Type, object> _services = new();
+    
+    public static void Register<T>(T service) where T : class
+ {
+        _services[typeof(T)] = service;
+    }
+    
+    public static T Get<T>() where T : class
+    {
+        if (_services.TryGetValue(typeof(T), out var service))
+      return (T)service;
+        
+        throw new InvalidOperationException($"Service {typeof(T).Name} not registered");
+    }
+    
+    public static void Clear() => _services.Clear();
+}
+
+// App.xaml.cs - Application startup
+protected override void OnStartup(StartupEventArgs e)
+{
+    base.OnStartup(e);
+    
+    // Register services
+    var httpClient = new HttpClient();
+  httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0...");
+    httpClient.Timeout = TimeSpan.FromSeconds(30);
+    
+    ServiceContainer.Register(httpClient);
+    ServiceContainer.Register(new DownloadSettings());
+    ServiceContainer.Register<ILogger>(new Logger());
+}
+
+// MainWindow.xaml.cs - use services
+private readonly HttpClient _httpClient = ServiceContainer.Get<HttpClient>();
+private readonly DownloadSettings _settings = ServiceContainer.Get<DownloadSettings>();
+```
+
+**Benefits:**
+- ✅ Central service registration
+- ✅ Singleton HttpClient (correct pattern)
+- ✅ Services reused across windows
+- ✅ Easier to test (register mocks)
+- ✅ No external dependencies
+- ✅ Simple to understand
+
+#### Phase 2: Microsoft.Extensions.DependencyInjection (Future)
+```csharp
+// Install-Package Microsoft.Extensions.DependencyInjection
+// Install-Package Microsoft.Extensions.Hosting
+
+public partial class App : Application
+{
+    private IServiceProvider? _serviceProvider;
+    
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        var services = new ServiceCollection();
+ 
+   // Register services
+        services.AddSingleton<HttpClient>(sp =>
+      {
+        var client = new HttpClient();
+        client.DefaultRequestHeaders.Add("User-Agent", "...");
+            return client;
+        });
+     
+     services.AddSingleton<DownloadSettings>();
+        services.AddSingleton<IImageScanner, ImageScanner>();
+    services.AddSingleton<IImageDownloader, ImageDownloader>();
+ services.AddTransient<MainWindow>();
+        
+        _serviceProvider = services.BuildServiceProvider();
+        
+     var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
+        mainWindow.Show();
+    }
+}
+```
+
+**Benefits:**
+- ✅ Industry standard
+- ✅ Lifetime management (Singleton, Transient, Scoped)
+- ✅ Constructor injection
+- ✅ IDisposable handled automatically
+- ✅ Works with .NET Generic Host
+
+---
+
+## 3. SHARED CONSTANTS 📊
+
+### Current State: Constants Duplicated Across Files
+
+**Problem:**
+```csharp
+// MainWindow.xaml.cs
+private const string STATUS_DONE = "✓ Done";
+private const string STATUS_DUPLICATE = "⊘ Duplicate";
+// ... 10 constants
+
+// ImageDownloader.cs
+private const string STATUS_DONE = "✓ Done";        // DUPLICATE!
+private const string STATUS_DUPLICATE = "⊘ Duplicate";  // DUPLICATE!
+// ... 11 constants
+
+// ImageScanner.cs
+private const int PAGE_LOAD_TIMEOUT_SECONDS = 60;
+// ... 8 constants
+
+// FileNameExtractor.cs
+private const int MAX_FILENAME_LENGTH = 200;
+// ... 4 constants
+```
+
+**Issues:**
+- ❌ Status strings duplicated in 2+ files
+- ❌ If we change "✓ Done" to "✓ Complete", must update 2 files
+- ❌ Risk of typos causing bugs
+- ❌ No single source of truth
+- ❌ Magic numbers still exist in some places
+
+**Count:**
+- **33 constants** across 6 files
+- **10 status strings** duplicated
+- **15 magic numbers** converted to constants
+- **Still some uncaptured values**
+
+---
+
+### Proposed Solution: Shared Constants Class
+
+```csharp
+// Constants\AppConstants.cs
+namespace WebsiteImagePilfer.Constants
+{
+    /// <summary>
+    /// Application-wide constant values.
+    /// Provides single source of truth for status strings, limits, and configuration.
+ /// </summary>
+    public static class AppConstants
+    {
+     /// <summary>
+        /// Status strings for download items
+        /// </summary>
+        public static class Status
+        {
+  public const string Ready = "Ready";
+            public const string Checking = "Checking...";
+  public const string FindingFullRes = "Finding full-res...";
+            public const string Downloading = "Downloading...";
+         public const string Done = "✓ Done";
+            public const string Backup = "✓ Backup";
+     public const string Duplicate = "⊘ Duplicate";
+ public const string Cancelled = "⊘ Canceled";
+       public const string Failed = "✗ Failed";
+   public const string Skipped = "⊘ Skipped";
+        public const string SkippedSize = "⊘ Skipped (too small)";
+public const string SkippedJpg = "⊘ Skipped (not JPG)";
+      public const string SkippedPng = "⊘ Skipped (not PNG)";
+   }
+        
+        /// <summary>
+        /// Network and HTTP timeouts
+        /// </summary>
+        public static class Network
+        {
+          public const int HttpTimeoutSeconds = 30;
+     public const int HeadRequestTimeoutSeconds = 5;
+            public const int PageLoadTimeoutSeconds = 60;
+            public const int ImplicitWaitSeconds = 10;
+        }
+        
+        /// <summary>
+      /// Scanning configuration
+        /// </summary>
+        public static class Scanning
+        {
+      public const int FastScanWaitMs = 5000;
+      public const int ThoroughScanCheckIntervalMs = 5000;
+          public const int ThoroughScanMaxStableChecks = 3;
+          public const int ScrollDelayMs = 1000;
+  public const int RetryDelayMs = 2000;
+   public const int MaxRetryCount = 3;
+        }
+   
+  /// <summary>
+        /// File system limits
+   /// </summary>
+        public static class Files
+        {
+      public const int MaxFilenameLength = 200;
+            public const int GuidShortLength = 8;
+      public const string FallbackExtension = ".jpg";
+            public const string QueryParamFilename = "f";
+        }
+        
+  /// <summary>
+        /// Preview and UI configuration
+   /// </summary>
+     public static class Preview
+  {
+            public const int MinDecodeWidth = 200;
+            public const int QualityMultiplier = 2;
+       public const int ColumnResizeDebounceMs = 500;
+     public const int ColumnWidthMonitorIntervalMs = 100;
+            public const int ColumnWidthChangeThreshold = 10;
+        }
+        
+      /// <summary>
+        /// Settings validation limits
+        /// </summary>
+      public static class Validation
+    {
+        public const int MinImageSize = 100;
+        public const int MaxImageSize = 1_000_000_000;
+            public const int MinItemsPerPage = 1;
+  public const int MaxItemsPerPage = 1000;
+            public const int MinMaxImagesToScan = 1;
+  public const int MaxMaxImagesToScan = 10000;
+        }
+        
+        /// <summary>
+        /// Image URL patterns and extensions
+        /// </summary>
+        public static class Images
+    {
+     public static readonly string[] SizePatterns = 
+                { "_800x800", "_small", "_medium", "_thumb", "_preview", "-thumb", "-preview" };
+            
+  public static readonly string[] Attributes = 
+  { "src", "data-src", "data-lazy-src", "data-original", "data-file" };
+     
+            public static readonly string[] Extensions = 
+                { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp" };
+    }
+        
+        /// <summary>
+ /// Converter constants
+     /// </summary>
+        public static class Converters
+        {
+   public const string UnknownIndex = "?";
+        }
+ }
+}
+```
+
+**Usage:**
+```csharp
+// Instead of:
+private const string STATUS_DONE = "✓ Done";
+if (item.Status == STATUS_DONE)
+
+// Use:
+using static WebsiteImagePilfer.Constants.AppConstants;
+if (item.Status == Status.Done)
+
+// Or:
+using WebsiteImagePilfer.Constants;
+if (item.Status == AppConstants.Status.Done)
+```
+
+**Benefits:**
+- ✅ Single source of truth
+- ✅ IntelliSense-friendly nested classes
+- ✅ XML documentation for all constants
+- ✅ Easy to find and update values
+- ✅ Grouped by logical category
+- ✅ Type-safe (no string typos)
+
+---
+
+## 4. EXCEPTION HANDLING PATTERNS 🛡️
+
+### Current State: Inconsistent Error Handling
+
+**Problem Patterns:**
+```csharp
+// Pattern 1: Generic catch with Debug.WriteLine
+catch (Exception ex)
+{
+    System.Diagnostics.Debug.WriteLine($"Error: {ex.Message}");
+}
+
+// Pattern 2: Specific catches with Debug.WriteLine
+catch (HttpRequestException ex)
+{
+    item.Status = STATUS_FAILED;
+    item.ErrorMessage = $"Network error: {ex.Message}";
+    Debug.WriteLine($"HTTP error for {item.FileName}: {ex.Message}");
+}
+
+// Pattern 3: Try-catch with UI feedback
+catch (Exception ex)
+{
+    ShowError($"Error: {ex.Message}");
+    _uiStateManager.UpdateStatus("Error occurred");
+}
+
+// Pattern 4: Silent catch (no logging)
+catch { /* Continue anyway */ }
+
+// Pattern 5: Catch and rethrow
+catch (OperationCanceledException)
+{
+    item.Status = STATUS_CANCELLED;
+    throw;
 }
 ```
 
 **Issues:**
-- This recursive visual tree traversal is performed EVERY TIME an item is rendered
-- ListView with 100 items = 100 tree traversals
-- Scrolling triggers re-rendering = MORE traversals
-- No caching mechanism
-- Performance impact on large lists
+- ❌ No consistent error handling strategy
+- ❌ Some exceptions logged, some silenced
+- ❌ No correlation between errors and user actions
+- ❌ Stack traces often lost
+- ❌ No error recovery patterns
+- ❌ Difficult to debug issues
 
-**Performance Analysis:**
-- Tree traversal: O(n) where n = depth of visual tree
-- Called per item: O(m) where m = items in view
-- Total complexity: O(n * m) per render cycle
-- Scrolling = continuous re-rendering = CPU intensive
+---
 
-### 3. **MAGIC RETURN VALUE**
-**Problem:**
+### Proposed Solution: Centralized Exception Handler
+
 ```csharp
-return "?";
+public static class ExceptionHandler
+{
+    public static void Handle(Exception ex, string context, 
+      bool showToUser = false, [CallerMemberName] string? source = null)
+    {
+        // Log the error
+        Logger.Error($"Exception in {context}", ex, source);
+        
+        // Show to user if requested
+        if (showToUser)
+        {
+         var userMessage = GetUserFriendlyMessage(ex, context);
+            MessageBox.Show(userMessage, "Error", 
+             MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+    
+    public static T HandleWithDefault<T>(Func<T> action, T defaultValue, 
+        string context, [CallerMemberName] string? source = null)
+    {
+        try
+  {
+            return action();
+        }
+        catch (Exception ex)
+   {
+            Handle(ex, context, showToUser: false, source: source);
+     return defaultValue;
+  }
+    }
+    
+ public static async Task<T> HandleAsync<T>(Func<Task<T>> action, T defaultValue,
+        string context, bool showToUser = false, [CallerMemberName] string? source = null)
+    {
+ try
+  {
+    return await action();
+        }
+ catch (OperationCanceledException)
+        {
+            Logger.Info($"Operation cancelled: {context}", source);
+            throw; // Cancellation should bubble up
+        }
+      catch (Exception ex)
+  {
+   Handle(ex, context, showToUser, source);
+        return defaultValue;
+        }
+    }
+    
+    private static string GetUserFriendlyMessage(Exception ex, string context)
+    {
+ return ex switch
+        {
+            HttpRequestException => $"Network error while {context}. Please check your connection.",
+        UnauthorizedAccessException => $"Access denied while {context}. Check file permissions.",
+         IOException => $"File system error while {context}.",
+        ArgumentException => $"Invalid input while {context}.",
+            _ => $"An error occurred while {context}.\n\n{ex.Message}"
+        };
+    }
+}
+
+// Usage:
+var result = await ExceptionHandler.HandleAsync(
+    async () => await DownloadImageAsync(url),
+    defaultValue: null,
+    context: "downloading image",
+    showToUser: true
+);
+```
+
+---
+
+## 5. CANCELLATION TOKEN PROPAGATION ⛔
+
+### Current State: Inconsistent Cancellation
+
+**Problems:**
+```csharp
+// Some methods accept CancellationToken
+public async Task<List<string>> ScanForImagesAsync(string url, CancellationToken cancellationToken)
+
+// Others use CancellationToken.None
+await _imageDownloader!.DownloadSingleItemAsync(item, CancellationToken.None);
+
+// Some create their own
+_cancellationTokenSource = new CancellationTokenSource();
+
+// Some don't propagate properly
+await Task.Delay(10, cancellationToken);  // Good!
+await SomeMethodAsync();  // Missing cancellationToken parameter
 ```
 
 **Issues:**
-- Hardcoded string literal "?" for error cases
-- No constant defined
-- Unclear to maintainers why "?" was chosen
-- No documentation of error conditions
-- Could return null or empty string instead
-- Inconsistent with rest of codebase (which uses constants)
+- ❌ Cancellation doesn't propagate consistently
+- ❌ Some operations can't be cancelled
+- ❌ Resource waste when user cancels
 
-### 4. **POOR TESTABILITY**
+---
+
+### Proposed Solution: Consistent Token Propagation
+
+**Guidelines:**
+1. ✅ All async methods that do I/O should accept `CancellationToken`
+2. ✅ Pass token to all child operations
+3. ✅ Never use `CancellationToken.None` in user-triggered operations
+4. ✅ Check `token.IsCancellationRequested` in loops
+5. ✅ Let `OperationCanceledException` bubble up
+
+---
+
+## 6. RESOURCE MANAGEMENT 🗑️
+
+### Current State: Incomplete Disposal
+
 **Problems:**
-- Requires actual WPF visual tree to test
-- Depends on MainWindow instance
-- Cannot mock dependencies
-- Integration test required instead of unit test
-- Difficult to test edge cases
-
-### 5. **LACK OF ERROR HANDLING**
-**Problems:**
-- No try-catch around visual tree operations
-- VisualTreeHelper can throw exceptions
-- MainWindow could be null
-- IndexFromContainer could return -1
-- Silent failure with "?" return
-
-## Proposed Solutions:
-
-### Solution A: **Dependency Property Approach** (Best for WPF)
-Create dependency properties on MainWindow that the converter can bind to:
-
 ```csharp
-// In MainWindow.xaml.cs
-public static readonly DependencyProperty CurrentPageProperty =
-    DependencyProperty.Register(nameof(CurrentPage), typeof(int), typeof(MainWindow));
+// HttpClient - Created but never disposed
+_httpClient = new HttpClient();
 
-public int CurrentPage
-{
-  get => (int)GetValue(CurrentPageProperty);
-    set => SetValue(CurrentPageProperty, value);
-}
+// CancellationTokenSource - Sometimes disposed
+_cancellationTokenSource?.Dispose();
+_cancellationTokenSource = null;
+
+// ChromeDriver - Try-catch finally for disposal
+try { driver?.Quit(); } catch { }
+try { driver?.Dispose(); } catch { }
+
+// Timer - Disposed implicitly?
+_columnResizeTimer = new System.Timers.Timer(500);
+
+// Streams - No explicit disposal in some places
 ```
 
-**Pros:**
-- Proper WPF pattern
-- Bindable from XAML
-- Change notification built-in
-- Encapsulation maintained
+**Issues:**
+- ❌ HttpClient should be singleton (not created per window)
+- ❌ Timers may not be disposed
+- ❌ No IDisposable pattern on service classes
+- ❌ Resource leaks possible
 
-**Cons:**
-- More boilerplate code
-- Requires understanding of dependency properties
+---
 
-### Solution B: **Converter Parameter Approach** (Simplest)
-Pass pagination info as converter parameter from XAML:
-
-```xaml
-<TextBlock Text="{Binding RelativeSource={RelativeSource AncestorType=ListViewItem}, 
-    Converter={StaticResource IndexConverter},
-    ConverterParameter={Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}}" />
-```
-
-**Pros:**
-- Simple to implement
-- No MainWindow changes needed
-- Testable
-
-**Cons:**
-- Complex XAML binding
-- Still needs visual tree traversal
-
-### Solution C: **ViewModel Approach** (MVVM Pattern)
-Move index calculation to ViewModel:
+### Proposed Solution: Proper Disposal Pattern
 
 ```csharp
-public class ImageItemViewModel
+// Service classes should implement IDisposable
+public class ImageDownloader : IDisposable
 {
-    public int GlobalIndex { get; set; }
-    public ImageDownloadItem Item { get; set; }
-}
-```
-
-**Pros:**
-- No converter needed
-- Fully testable
-- Follows MVVM
-- Best performance
-
-**Cons:**
-- Requires ViewModel layer
-- More significant refactoring
-
-### Solution D: **Attached Property Approach** (Recommended for now)
-Create an attached property that caches the pagination context:
-
-```csharp
-public static class ListViewHelper
-{
-    public static readonly DependencyProperty PaginationContextProperty =
-        DependencyProperty.RegisterAttached("PaginationContext", 
-      typeof(PaginationContext), typeof(ListViewHelper));
+    private readonly HttpClient _httpClient;
+ private bool _disposed;
     
-    public static void SetPaginationContext(DependencyObject obj, PaginationContext value)
-   => obj.SetValue(PaginationContextProperty, value);
-    
-    public static PaginationContext GetPaginationContext(DependencyObject obj)
-     => (PaginationContext)obj.GetValue(PaginationContextProperty);
+    public void Dispose()
+ {
+        if (_disposed) return;
+        
+        // Dispose managed resources
+        _cancellationTokenSource?.Dispose();
+        
+        _disposed = true;
+    }
 }
 
-public class PaginationContext
+// MainWindow should dispose services
+protected override void OnClosed(EventArgs e)
 {
-    public int CurrentPage { get; set; }
-    public int ItemsPerPage { get; set; }
+    _cancellationTokenSource?.Cancel();
+    _cancellationTokenSource?.Dispose();
+    _columnResizeTimer?.Dispose();
+    _imageScanner?.Dispose();
+    _imageDownloader?.Dispose();
+    _previewLoader?.Dispose();
+ 
+    base.OnClosed(e);
 }
 ```
 
-**Pros:**
-- Encapsulation maintained
-- Caches context (no repeated tree traversal)
-- Testable
-- Minimal changes to existing code
+---
 
-**Cons:**
-- Requires new helper class
-- Need to update context when pagination changes
+## Implementation Plan
 
-## Recommended Implementation Plan:
+### Phase 1: Quick Wins (30 minutes)
+1. ✅ Create `AppConstants.cs` with all shared constants
+2. ✅ Replace duplicate constants across files
+3. ✅ Create simple `Logger` class
+4. ✅ Replace 5-10 Debug.WriteLine calls as examples
+5. ✅ Test that build succeeds
 
-### Phase 1: Fix Encapsulation (Immediate)
-1. Change public fields to private in MainWindow
-2. Add public properties with proper encapsulation
-3. Update converter to use properties
+### Phase 2: Service Locator (1 hour)
+1. Create `ServiceContainer` class
+2. Register services in App.xaml.cs
+3. Update MainWindow to use ServiceContainer
+4. Update SettingsWindow
+5. Test HttpClient is shared correctly
 
-### Phase 2: Add Constants (Immediate)
-1. Define `UNKNOWN_INDEX` constant for "?"
-2. Document why this value is used
+### Phase 3: Exception Handling (1 hour)
+1. Create `ExceptionHandler` class
+2. Update 3-5 methods to use it
+3. Add user-friendly error messages
+4. Test error scenarios
 
-### Phase 3: Optimize Tree Traversal (Short-term)
-1. Implement attached property for pagination context
-2. Cache context on ListView
-3. Update on page changes
+### Phase 4: Full Logging (1-2 hours)
+1. Replace all Debug.WriteLine calls
+2. Add logging to all service methods
+3. Test log file output
+4. Add log viewer/export feature (optional)
 
-### Phase 4: Improve Error Handling (Short-term)
-1. Add try-catch around visual tree operations
-2. Add proper null checking
-3. Log errors for diagnostics
+### Phase 5: Resource Management (1 hour)
+1. Add IDisposable to service classes
+2. Update MainWindow.OnClosed
+3. Test for memory leaks
+4. Verify proper cleanup
 
-### Phase 5: Consider MVVM (Long-term)
-1. Create ViewModels for items
-2. Calculate indices in ViewModel
-3. Remove converter entirely
+---
 
-## Files to Modify:
+## Files to Create
 
-1. **Converters\ListViewIndexConverter.cs**
-   - Add constants
-   - Improve error handling
-   - Use properties instead of fields
+1. **Constants\AppConstants.cs** - Shared constants
+2. **Services\Logger.cs** - Logging infrastructure
+3. **Services\ServiceContainer.cs** - Simple DI container
+4. **Helpers\ExceptionHandler.cs** - Exception handling
 
-2. **MainWindow.xaml.cs**
-   - Change fields to private
-   - Add public properties
-   - Consider adding dependency properties
+## Files to Modify
 
-3. **MainWindow.xaml** (if needed)
-   - Update bindings if using new approach
+1. **App.xaml.cs** - Service registration
+2. **MainWindow.xaml.cs** - Use ServiceContainer, Logger
+3. **ImageScanner.cs** - Replace Debug.WriteLine with Logger
+4. **ImageDownloader.cs** - Use shared constants, Logger
+5. **ImagePreviewLoader.cs** - Add logging
+6. **UIStateManager.cs** - Add logging
+7. **FileNameExtractor.cs** - Use shared constants
+8. **PortableSettingsManager.cs** - Use Logger instead of Debug
 
-## Testing Considerations:
+---
 
-- Unit test the index calculation logic
-- Test with empty list
-- Test with single item
-- Test with multiple pages
-- Test page boundary conditions
-- Test with rapid scrolling
-- Performance test with 1000+ items
+## Acceptance Criteria
 
-## Performance Metrics to Track:
+✅ AppConstants class created with all shared values  
+✅ No duplicate status string constants  
+✅ Logger class with Debug, Info, Warning, Error methods  
+✅ At least 20 Debug.WriteLine calls replaced with Logger  
+✅ Log file created in logs\ directory  
+✅ ServiceContainer created and services registered  
+✅ HttpClient is singleton across application  
+✅ ExceptionHandler class created  
+✅ At least 3 methods use ExceptionHandler  
+✅ IDisposable implemented on service classes  
+✅ MainWindow properly disposes resources  
+✅ Build succeeds with no warnings  
+✅ Application runs without regression  
 
-- Conversion time per item (should be < 1ms)
-- Tree traversal count per render
-- Memory allocations per conversion
-- CPU usage during scrolling
+---
 
-## Acceptance Criteria:
+## Estimated Time: 30-60 minutes for Phase 1 (quick wins)
 
-✅ No public fields exposed on MainWindow
-✅ Constants used instead of magic strings
-✅ Proper error handling with logging
-✅ Performance improved (fewer tree traversals)
-✅ Code is testable without full WPF context
-✅ Documentation added explaining approach
-✅ Build succeeds with no warnings
-✅ Application runs without regression
+## Priority: Medium-High (improves maintainability significantly)
 
-## Estimated Time: 10-15 minutes for basic fixes
+## Benefits After Completion
 
-## Priority: Medium (Encapsulation violation should be fixed)
+- 🎯 Single source of truth for constants
+- 📊 Proper logging for production debugging
+- 🔌 Centralized service management
+- 🛡️ Consistent error handling
+- 🗑️ No resource leaks
+- 📈 Better code maintainability
+- 🧪 Easier unit testing
+- 🚀 Foundation for future improvements

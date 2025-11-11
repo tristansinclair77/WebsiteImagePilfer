@@ -1,15 +1,14 @@
 using System;
 using System.Web;
+using WebsiteImagePilfer.Constants;
+using static WebsiteImagePilfer.Constants.AppConstants;
 using IOPath = System.IO.Path;
 
 namespace WebsiteImagePilfer.Helpers
 {
     public static class FileNameExtractor
     {
-        private const int MAX_FILENAME_LENGTH = 200;
-        private const int GUID_SHORT_LENGTH = 8;
-        private const string FALLBACK_EXTENSION = ".jpg";
-        private const string QUERY_PARAM_FILENAME = "f";
+        // Constants removed - using AppConstants
 
         public static string ExtractFromUrl(string imageUrl)
         {
@@ -17,42 +16,42 @@ namespace WebsiteImagePilfer.Helpers
             var fileName = "";
 
             // Check for ?f= query parameter (contains actual filename)
-            if (uri.Query.Contains($"?{QUERY_PARAM_FILENAME}=") || uri.Query.Contains($"&{QUERY_PARAM_FILENAME}="))
-            {
+            if (uri.Query.Contains($"?{Files.QueryParamFilename}=") || uri.Query.Contains($"&{Files.QueryParamFilename}="))
+  {
                 var queryParams = HttpUtility.ParseQueryString(uri.Query);
-                var fParam = queryParams[QUERY_PARAM_FILENAME];
-                if (!string.IsNullOrEmpty(fParam))
-                    fileName = fParam;
-            }
+var fParam = queryParams[Files.QueryParamFilename];
+             if (!string.IsNullOrEmpty(fParam))
+  fileName = fParam;
+       }
 
-            // Fallback to path filename if no query parameter
+ // Fallback to path filename if no query parameter
             if (string.IsNullOrEmpty(fileName))
-                fileName = IOPath.GetFileName(uri.LocalPath);
+          fileName = IOPath.GetFileName(uri.LocalPath);
 
-            // Final fallback if still empty
+   // Final fallback if still empty
             if (string.IsNullOrEmpty(fileName) || !IOPath.HasExtension(fileName))
-                fileName = GenerateFallbackFileName();
+     fileName = GenerateFallbackFileName();
 
-            return SanitizeFileName(fileName);
+  return SanitizeFileName(fileName);
         }
 
         public static string SanitizeFileName(string fileName)
         {
-            // Remove invalid path characters
-            var invalidChars = IOPath.GetInvalidFileNameChars();
-            var sanitized = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
+    // Remove invalid path characters
+      var invalidChars = IOPath.GetInvalidFileNameChars();
+         var sanitized = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
 
-            // Ensure filename is not too long
-            if (sanitized.Length > MAX_FILENAME_LENGTH)
-            {
-                var extension = IOPath.GetExtension(sanitized);
-                sanitized = sanitized[..(MAX_FILENAME_LENGTH - extension.Length)] + extension;
-            }
+       // Ensure filename is not too long
+            if (sanitized.Length > Files.MaxFilenameLength)
+  {
+       var extension = IOPath.GetExtension(sanitized);
+  sanitized = sanitized[..(Files.MaxFilenameLength - extension.Length)] + extension;
+       }
 
             return sanitized;
         }
 
         private static string GenerateFallbackFileName() =>
-            $"image_{DateTime.Now:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N")[..GUID_SHORT_LENGTH]}{FALLBACK_EXTENSION}";
+        $"image_{DateTime.Now:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N")[..Files.GuidShortLength]}{Files.FallbackExtension}";
     }
 }

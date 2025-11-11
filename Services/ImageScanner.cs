@@ -8,24 +8,14 @@ using System.Windows;
 using HtmlAgilityPack;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
+using WebsiteImagePilfer.Constants;
+using static WebsiteImagePilfer.Constants.AppConstants;
 using IOPath = System.IO.Path;
 
 namespace WebsiteImagePilfer.Services
 {
     public class ImageScanner
     {
-        private const int FAST_SCAN_WAIT_MS = 5000;
-        private const int THOROUGH_SCAN_CHECK_INTERVAL_MS = 5000;
-        private const int THOROUGH_SCAN_MAX_STABLE_CHECKS = 3;
-        private const int SCROLL_DELAY_MS = 1000;
-        private const int RETRY_DELAY_MS = 2000;
-        private const int MAX_RETRY_COUNT = 3;
-        private const int PAGE_LOAD_TIMEOUT_SECONDS = 60;
-        private const int IMPLICIT_WAIT_SECONDS = 10;
-
-        private static readonly string[] IMAGE_ATTRIBUTES = { "src", "data-src", "data-lazy-src", "data-original", "data-file" };
-        private static readonly string[] IMAGE_EXTENSIONS = { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp" };
-
         private readonly Action<string> _updateStatus;
 
         public ImageScanner(Action<string> updateStatus) => _updateStatus = updateStatus;
@@ -78,8 +68,8 @@ namespace WebsiteImagePilfer.Services
             options.PageLoadStrategy = PageLoadStrategy.Normal;
 
             var driver = new ChromeDriver(options);
-            driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(PAGE_LOAD_TIMEOUT_SECONDS);
-            driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(IMPLICIT_WAIT_SECONDS);
+            driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(Scanning.PageLoadTimeoutSeconds);
+            driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(Network.ImplicitWaitSeconds);
 
             BringMainWindowToFront();
             LoadPageWithRetry(driver, url);
@@ -106,7 +96,7 @@ namespace WebsiteImagePilfer.Services
         {
             _updateStatus("Loading page with JavaScript...");
 
-            for (int retryCount = 0; retryCount < MAX_RETRY_COUNT; retryCount++)
+            for (int retryCount = 0; retryCount < Scanning.MaxRetryCount; retryCount++)
             {
                 try
                 {
@@ -115,9 +105,9 @@ namespace WebsiteImagePilfer.Services
                 }
                 catch (WebDriverTimeoutException)
                 {
-                    if (retryCount >= MAX_RETRY_COUNT - 1) throw;
-                    _updateStatus($"Page load timeout, retrying ({retryCount + 1}/{MAX_RETRY_COUNT})...");
-                    Thread.Sleep(RETRY_DELAY_MS);
+                    if (retryCount >= Scanning.MaxRetryCount - 1) throw;
+                    _updateStatus($"Page load timeout, retrying ({retryCount + 1}/{Scanning.MaxRetryCount})...");
+                    Thread.Sleep(Scanning.RetryDelayMs);
                 }
             }
         }
@@ -125,9 +115,9 @@ namespace WebsiteImagePilfer.Services
         private void PerformFastScan(IWebDriver driver, CancellationToken cancellationToken)
         {
             _updateStatus("Fast scan: Waiting for images to load...");
-            Thread.Sleep(FAST_SCAN_WAIT_MS);
+            Thread.Sleep(Scanning.FastScanWaitMs);
             ScrollPage(driver);
-            Thread.Sleep(RETRY_DELAY_MS);
+            Thread.Sleep(Scanning.RetryDelayMs);
         }
 
         private void PerformThoroughScan(IWebDriver driver, HashSet<string> imageUrls, CancellationToken cancellationToken)
@@ -137,10 +127,10 @@ namespace WebsiteImagePilfer.Services
             int previousCount = 0;
             int stableCount = 0;
 
-            while (stableCount < THOROUGH_SCAN_MAX_STABLE_CHECKS && !cancellationToken.IsCancellationRequested)
+            while (stableCount < Scanning.ThoroughScanMaxStableChecks && !cancellationToken.IsCancellationRequested)
             {
                 ScrollPage(driver);
-                Thread.Sleep(THOROUGH_SCAN_CHECK_INTERVAL_MS);
+                Thread.Sleep(Scanning.ThoroughScanCheckIntervalMs);
 
                 var currentImages = ExtractCurrentImages(driver, cancellationToken);
                 int currentCount = currentImages.Count;
@@ -155,7 +145,7 @@ namespace WebsiteImagePilfer.Services
                 else
                 {
                     stableCount++;
-                    _updateStatus($"Thorough scan: Stable at {currentCount} images ({stableCount}/{THOROUGH_SCAN_MAX_STABLE_CHECKS} checks)...");
+                    _updateStatus($"Thorough scan: Stable at {currentCount} images ({stableCount}/{Scanning.ThoroughScanMaxStableChecks} checks)...");
                 }
             }
         }
@@ -166,9 +156,9 @@ namespace WebsiteImagePilfer.Services
             {
                 var js = (IJavaScriptExecutor)driver;
                 js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight);");
-                Thread.Sleep(SCROLL_DELAY_MS);
+                Thread.Sleep(Scanning.ScrollDelayMs);
                 js.ExecuteScript("window.scrollTo(0, document.body.scrollHeight / 2);");
-                Thread.Sleep(SCROLL_DELAY_MS);
+                Thread.Sleep(Scanning.ScrollDelayMs);
                 js.ExecuteScript("window.scrollTo(0, 0);");
             }
             catch { /* Scroll failed, continue anyway */ }
@@ -225,7 +215,7 @@ namespace WebsiteImagePilfer.Services
                 }
 
                 // Check img attributes for image URLs
-                foreach (var attr in IMAGE_ATTRIBUTES)
+                foreach (var attr in Images.Attributes)
                 {
                     var src = img.GetAttributeValue(attr, "");
                     if (!string.IsNullOrEmpty(src) && !src.StartsWith("data:") &&
@@ -247,7 +237,7 @@ namespace WebsiteImagePilfer.Services
             if (string.IsNullOrEmpty(href)) return null;
 
             var lower = href.ToLowerInvariant();
-            bool isImageLink = IMAGE_EXTENSIONS.Any(ext => lower.Contains(ext));
+            bool isImageLink = Images.Extensions.Any(ext => lower.Contains(ext));
 
             if (isImageLink && Uri.TryCreate(baseUri, href, out Uri? absoluteUri))
                 return absoluteUri.ToString();
@@ -257,7 +247,7 @@ namespace WebsiteImagePilfer.Services
 
         private void ExtractFromRegex(string renderedHtml, HashSet<string> imageUrls, CancellationToken cancellationToken)
         {
-            var extensions = string.Join("|", IMAGE_EXTENSIONS.Select(e => e.TrimStart('.')));
+            var extensions = string.Join("|", Images.Extensions.Select(e => e.TrimStart('.')));
             var imageUrlPattern = $@"https?://[^\s""'<>\\]+?\.(?:{extensions})(?:\?[^\s""'<>\\]*)?";
             var matches = Regex.Matches(renderedHtml, imageUrlPattern, RegexOptions.IgnoreCase);
 
