@@ -6,6 +6,7 @@ using System.Windows.Data;
 using System.Windows.Media;
 using WebsiteImagePilfer.Constants;
 using WebsiteImagePilfer.Services;
+using WebsiteImagePilfer.ViewModels;
 using static WebsiteImagePilfer.Constants.AppConstants;
 
 namespace WebsiteImagePilfer.Converters
@@ -16,8 +17,6 @@ namespace WebsiteImagePilfer.Converters
     /// </summary>
     public class ListViewIndexConverter : IValueConverter
     {
-        // Constant removed - using AppConstants
-
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
    {
    try
@@ -27,19 +26,19 @@ namespace WebsiteImagePilfer.Converters
       var listView = FindParent<ListView>(listViewItem);
     if (listView != null)
   {
-      // Try to get cached pagination context first (avoids tree traversal to MainWindow)
+      // Try to get cached pagination context first (avoids tree traversal)
    var paginationContext = ListViewHelper.GetPaginationContext(listView);
   
   if (paginationContext == null)
      {
-   // Fallback: traverse to MainWindow if context not set
-      var mainWindow = FindParent<MainWindow>(listView);
-          if (mainWindow != null)
+   // Fallback: Get from DataContext (ViewModel)
+    var window = FindParent<Window>(listView);
+ if (window?.DataContext is MainWindowViewModel viewModel)
    {
    paginationContext = new PaginationContext
       {
-         CurrentPage = mainWindow.CurrentPage,
-        ItemsPerPage = mainWindow.ItemsPerPage
+    CurrentPage = viewModel.CurrentPage,
+        ItemsPerPage = viewModel.Settings.ItemsPerPage
         };
 
    // Cache the context for future conversions
@@ -51,16 +50,16 @@ namespace WebsiteImagePilfer.Converters
     {
        int localIndex = listView.ItemContainerGenerator.IndexFromContainer(listViewItem);
 
-    if (localIndex >= 0)
+  if (localIndex >= 0)
      {
    // Calculate global index based on current page
   int globalIndex = ((paginationContext.CurrentPage - 1) * paginationContext.ItemsPerPage) + localIndex + 1;
-        return globalIndex.ToString();
+   return globalIndex.ToString();
   }
-       }
-         }
+ }
+      }
     }
-        }
+   }
   catch (Exception ex)
    {
     // Log error for diagnostics but don't crash the UI
@@ -73,7 +72,7 @@ namespace WebsiteImagePilfer.Converters
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
      {
-        throw new NotImplementedException();
+  throw new NotImplementedException();
 }
 
    /// <summary>
@@ -83,26 +82,26 @@ namespace WebsiteImagePilfer.Converters
  /// <param name="child">The child element to start from.</param>
     /// <returns>The parent of type T, or null if not found.</returns>
 private static T? FindParent<T>(DependencyObject child) where T : DependencyObject
-        {
-    if (child == null)
+   {
+ if (child == null)
    return null;
 
          try
 {
          DependencyObject parentObject = VisualTreeHelper.GetParent(child);
   if (parentObject == null) 
-    return null;
+  return null;
 
-        if (parentObject is T parent)
-      return parent;
+if (parentObject is T parent)
+return parent;
 else
    return FindParent<T>(parentObject);
        }
-        catch (Exception ex)
+  catch (Exception ex)
  {
     // Handle cases where visual tree operations might fail
   Logger.Error($"FindParent error", ex);
-        return null;
+    return null;
     }
  }
     }
@@ -132,7 +131,7 @@ else
     /// </summary>
     public class PaginationContext
     {
-    public int CurrentPage { get; set; }
+ public int CurrentPage { get; set; }
    public int ItemsPerPage { get; set; }
     }
 }
