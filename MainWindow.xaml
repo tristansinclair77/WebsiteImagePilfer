@@ -1,13 +1,14 @@
 ﻿<Window x:Class="WebsiteImagePilfer.MainWindow"
-      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 xmlns:local="clr-namespace:WebsiteImagePilfer"
+xmlns:converters="clr-namespace:WebsiteImagePilfer.Converters"
       mc:Ignorable="d"
      Title="Website Image Pilfer" Height="600" Width="900">
   <Window.Resources>
-   <local:ListViewIndexConverter x:Key="IndexConverter"/>
+   <converters:ListViewIndexConverter x:Key="IndexConverter"/>
     </Window.Resources>
   <Grid Margin="10">
      <Grid.RowDefinitions>
