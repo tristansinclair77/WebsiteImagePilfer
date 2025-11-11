@@ -273,20 +273,23 @@ namespace WebsiteImagePilfer.Services
         {
             var extension = IOPath.GetExtension(fileName).ToLowerInvariant();
 
-            if (_settings.FilterJpgOnly && extension != ".jpg" && extension != ".jpeg")
+            // If no file types are specified in AllowedFileTypes, allow all types
+            if (_settings.AllowedFileTypes.Count == 0)
             {
-                filterReason = Status.SkippedJpg;
-                return false;
+                filterReason = null;
+                return true;
             }
 
-            if (_settings.FilterPngOnly && extension != ".png")
+            // If file types are specified, only allow those types
+            if (_settings.AllowedFileTypes.Contains(extension))
             {
-                filterReason = Status.SkippedPng;
-                return false;
+                filterReason = null;
+                return true;
             }
 
-            filterReason = null;
-            return true;
+            // File type not in allowed list
+            filterReason = $"? Skipped ({extension})";
+            return false;
         }
     }
 }

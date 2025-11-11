@@ -310,7 +310,7 @@ namespace WebsiteImagePilfer.ViewModels
 
             // Initialize services
             _httpClient = HttpClientFactory.Instance;
-            _imageScanner = new ImageScanner(status => StatusText = status);
+            _imageScanner = new ImageScanner(status => StatusText = status, Settings);
             _imageDownloader = new ImageDownloader(_httpClient, Settings, _downloadFolder);
             _previewLoader = new ImagePreviewLoader(_httpClient);
 

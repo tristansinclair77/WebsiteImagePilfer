@@ -25,6 +25,9 @@ namespace WebsiteImagePilfer
             public bool LimitScanCount { get; set; } = false;
             public int MaxImagesToScan { get; set; } = 20;
             public int ItemsPerPage { get; set; } = 50;
+            
+            // New property for file type filtering
+            public List<string> AllowedFileTypes { get; set; } = new List<string>();
 
             public bool IsValid(out string? validationError)
             {
@@ -46,11 +49,8 @@ namespace WebsiteImagePilfer
                     return false;
                 }
 
-                if (FilterJpgOnly && FilterPngOnly)
-                {
-                    validationError = "Cannot enable both FilterJpgOnly and FilterPngOnly";
-                    return false;
-                }
+                // Remove the validation that prevented both JPG and PNG from being enabled
+                // (Now they can both be checked, meaning both file types are allowed)
 
                 validationError = null;
                 return true;
@@ -62,11 +62,8 @@ namespace WebsiteImagePilfer
                 ItemsPerPage = Math.Clamp(ItemsPerPage, Validation.MinItemsPerPage, Validation.MaxItemsPerPage);
                 MaxImagesToScan = Math.Clamp(MaxImagesToScan, Validation.MinMaxImagesToScan, Validation.MaxMaxImagesToScan);
 
-                if (FilterJpgOnly && FilterPngOnly)
-                {
-                    FilterJpgOnly = false;
-                    FilterPngOnly = false;
-                }
+                // Remove the logic that disabled both flags
+                // No longer needed with new collection-based approach
             }
         }
 

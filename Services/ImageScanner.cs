@@ -9,6 +9,7 @@ using HtmlAgilityPack;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using WebsiteImagePilfer.Constants;
+using WebsiteImagePilfer.Models;
 using static WebsiteImagePilfer.Constants.AppConstants;
 using IOPath = System.IO.Path;
 
@@ -17,6 +18,7 @@ namespace WebsiteImagePilfer.Services
     public class ImageScanner
     {
         private readonly Action<string> _updateStatus;
+        private readonly DownloadSettings _settings;
 
         // Static compiled regex for image URL extraction - improves performance by caching the pattern
         private static readonly Lazy<Regex> _imageUrlRegex = new Lazy<Regex>(() =>
@@ -26,7 +28,11 @@ namespace WebsiteImagePilfer.Services
             return new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
         });
 
-        public ImageScanner(Action<string> updateStatus) => _updateStatus = updateStatus;
+        public ImageScanner(Action<string> updateStatus, DownloadSettings settings)
+        {
+            _updateStatus = updateStatus;
+            _settings = settings;
+        }
 
         public async Task<List<string>> ScanForImagesAsync(string url, CancellationToken cancellationToken, bool useFastScan = false)
         {
@@ -56,7 +62,47 @@ namespace WebsiteImagePilfer.Services
                 }
             }, cancellationToken);
 
-            return imageUrls.ToList();
+            // Apply file type filter before returning
+            var filteredUrls = FilterImageUrlsByFileType(imageUrls);
+            return filteredUrls.ToList();
+        }
+
+        /// <summary>
+        /// Filters image URLs based on AllowedFileTypes setting.
+        /// If AllowedFileTypes is empty, all images are allowed.
+        /// </summary>
+        private HashSet<string> FilterImageUrlsByFileType(HashSet<string> imageUrls)
+        {
+            // If no file type filter is set, return all URLs
+            if (_settings.AllowedFileTypes.Count == 0)
+            {
+                return imageUrls;
+            }
+
+            var filteredUrls = new HashSet<string>();
+            
+            foreach (var url in imageUrls)
+            {
+                // Extract extension from URL (handle query strings)
+                var uri = new Uri(url);
+                var path = uri.AbsolutePath;
+                var extension = IOPath.GetExtension(path).ToLowerInvariant();
+                
+                // Check if this extension is allowed
+                if (_settings.AllowedFileTypes.Contains(extension))
+                {
+                    filteredUrls.Add(url);
+                }
+            }
+
+            int filteredCount = imageUrls.Count - filteredUrls.Count;
+            if (filteredCount > 0)
+            {
+                var allowedTypes = string.Join(", ", _settings.AllowedFileTypes);
+                _updateStatus($"Filtered {filteredCount} images (showing only: {allowedTypes})");
+            }
+
+            return filteredUrls;
         }
 
         private IWebDriver InitializeWebDriver(string url)

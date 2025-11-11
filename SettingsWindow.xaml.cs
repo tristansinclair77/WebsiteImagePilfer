@@ -16,8 +16,13 @@ namespace WebsiteImagePilfer
             FilterBySizeCheckBox.IsChecked = _settings.FilterBySize;
             MinSizeSlider.Value = _settings.MinimumImageSize;
             ShowThumbnailsCheckBox.IsChecked = _settings.ShowThumbnails;
-            FilterJpgCheckBox.IsChecked = _settings.FilterJpgOnly;
-            FilterPngCheckBox.IsChecked = _settings.FilterPngOnly;
+            
+            // Load file type filters from AllowedFileTypes collection
+            FilterJpgCheckBox.IsChecked = _settings.AllowedFileTypes.Contains(".jpg") || _settings.AllowedFileTypes.Contains(".jpeg");
+            FilterPngCheckBox.IsChecked = _settings.AllowedFileTypes.Contains(".png");
+            FilterGifCheckBox.IsChecked = _settings.AllowedFileTypes.Contains(".gif");
+            FilterWebpCheckBox.IsChecked = _settings.AllowedFileTypes.Contains(".webp");
+            
             SkipFullResCheckBox.IsChecked = _settings.SkipFullResolutionCheck;
             LimitScanCheckBox.IsChecked = _settings.LimitScanCount;
             MaxImagesSlider.Value = _settings.MaxImagesToScan;
@@ -31,21 +36,35 @@ namespace WebsiteImagePilfer
             _settings.FilterBySize = FilterBySizeCheckBox.IsChecked.GetValueOrDefault();
             _settings.MinimumImageSize = (int)MinSizeSlider.Value;
             _settings.ShowThumbnails = ShowThumbnailsCheckBox.IsChecked.GetValueOrDefault();
-            _settings.FilterJpgOnly = FilterJpgCheckBox.IsChecked.GetValueOrDefault();
-            _settings.FilterPngOnly = FilterPngCheckBox.IsChecked.GetValueOrDefault();
+            
+            // Build AllowedFileTypes collection based on checked boxes
+            _settings.AllowedFileTypes.Clear();
+            if (FilterJpgCheckBox.IsChecked.GetValueOrDefault())
+            {
+                _settings.AllowedFileTypes.Add(".jpg");
+                _settings.AllowedFileTypes.Add(".jpeg");
+            }
+            if (FilterPngCheckBox.IsChecked.GetValueOrDefault())
+            {
+                _settings.AllowedFileTypes.Add(".png");
+            }
+            if (FilterGifCheckBox.IsChecked.GetValueOrDefault())
+            {
+                _settings.AllowedFileTypes.Add(".gif");
+            }
+            if (FilterWebpCheckBox.IsChecked.GetValueOrDefault())
+            {
+                _settings.AllowedFileTypes.Add(".webp");
+            }
+            
             _settings.SkipFullResolutionCheck = SkipFullResCheckBox.IsChecked.GetValueOrDefault();
             _settings.LimitScanCount = LimitScanCheckBox.IsChecked.GetValueOrDefault();
             _settings.MaxImagesToScan = (int)MaxImagesSlider.Value;
             _settings.LoadPreviews = LoadPreviewsCheckBox.IsChecked.GetValueOrDefault();
             _settings.ItemsPerPage = (int)ItemsPerPageSlider.Value;
 
-            // Validate file type filters - simplified validation
-            if (_settings.FilterJpgOnly && _settings.FilterPngOnly)
-            {
-                MessageBox.Show("You cannot select both JPG and PNG only filters. Please choose one or neither.", 
-  "Invalid Settings", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
+            // No validation needed - all combinations are now valid
+            // If no file types are checked, all file types will be allowed
 
             DialogResult = true;
             Close();

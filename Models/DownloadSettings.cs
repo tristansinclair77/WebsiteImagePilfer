@@ -5,8 +5,17 @@ namespace WebsiteImagePilfer.Models
         public bool FilterBySize { get; set; }
         public int MinimumImageSize { get; set; } = 5000;
         public bool ShowThumbnails { get; set; } = true;
+        
+        // Legacy properties for backward compatibility with saved settings
+        [Obsolete("Use AllowedFileTypes instead")]
         public bool FilterJpgOnly { get; set; }
+        [Obsolete("Use AllowedFileTypes instead")]
         public bool FilterPngOnly { get; set; }
+        
+        // New property: collection of allowed file extensions (e.g., ".jpg", ".png")
+        // If empty, all file types are allowed
+        public HashSet<string> AllowedFileTypes { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        
         public bool SkipFullResolutionCheck { get; set; }
         public bool LimitScanCount { get; set; }
         public int MaxImagesToScan { get; set; } = 20;
@@ -21,12 +30,30 @@ namespace WebsiteImagePilfer.Models
             MinimumImageSize = appSettings.MinimumImageSize;
             ShowThumbnails = appSettings.ShowThumbnails;
             LoadPreviews = appSettings.LoadPreviews;
-            FilterJpgOnly = appSettings.FilterJpgOnly;
-            FilterPngOnly = appSettings.FilterPngOnly;
             SkipFullResolutionCheck = appSettings.SkipFullResolutionCheck;
             LimitScanCount = appSettings.LimitScanCount;
             MaxImagesToScan = appSettings.MaxImagesToScan;
             ItemsPerPage = appSettings.ItemsPerPage;
+            
+            // Load new AllowedFileTypes or migrate from legacy settings
+            if (appSettings.AllowedFileTypes != null && appSettings.AllowedFileTypes.Count > 0)
+            {
+                AllowedFileTypes = new HashSet<string>(appSettings.AllowedFileTypes, StringComparer.OrdinalIgnoreCase);
+            }
+            else
+            {
+                // Migrate from legacy boolean flags
+                AllowedFileTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (appSettings.FilterJpgOnly)
+                {
+                    AllowedFileTypes.Add(".jpg");
+                    AllowedFileTypes.Add(".jpeg");
+                }
+                if (appSettings.FilterPngOnly)
+                {
+                    AllowedFileTypes.Add(".png");
+                }
+            }
         }
 
         // Save settings to portable JSON asynchronously
@@ -40,12 +67,14 @@ namespace WebsiteImagePilfer.Models
                 MinimumImageSize = MinimumImageSize,
                 ShowThumbnails = ShowThumbnails,
                 LoadPreviews = LoadPreviews,
-                FilterJpgOnly = FilterJpgOnly,
-                FilterPngOnly = FilterPngOnly,
                 SkipFullResolutionCheck = SkipFullResolutionCheck,
                 LimitScanCount = LimitScanCount,
                 MaxImagesToScan = MaxImagesToScan,
-                ItemsPerPage = ItemsPerPage
+                ItemsPerPage = ItemsPerPage,
+                AllowedFileTypes = AllowedFileTypes.ToList(),
+                // Keep legacy properties for backward compatibility
+                FilterJpgOnly = AllowedFileTypes.Contains(".jpg") || AllowedFileTypes.Contains(".jpeg"),
+                FilterPngOnly = AllowedFileTypes.Contains(".png")
             };
             await PortableSettingsManager.SaveSettingsAsync(appSettings).ConfigureAwait(false);
         }

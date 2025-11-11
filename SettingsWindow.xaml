@@ -81,12 +81,18 @@ Style="{StaticResource SimpleCheckBox}"
             <StackPanel Margin="{StaticResource PaddingStandard}">
      <CheckBox x:Name="FilterJpgCheckBox" 
      Style="{StaticResource SimpleCheckBox}"
-     Content="Download JPG/JPEG only"/>
+     Content="Allow JPG/JPEG files"/>
        <CheckBox x:Name="FilterPngCheckBox" 
       Style="{StaticResource SimpleCheckBox}"
- Content="Download PNG only"/>
+ Content="Allow PNG files"/>
+     <CheckBox x:Name="FilterGifCheckBox" 
+      Style="{StaticResource SimpleCheckBox}"
+ Content="Allow GIF files"/>
+     <CheckBox x:Name="FilterWebpCheckBox" 
+      Style="{StaticResource SimpleCheckBox}"
+ Content="Allow WEBP files"/>
           <TextBlock Style="{StaticResource HelpText}"
-          Text="Note: Leave both unchecked to download all image types"/>
+          Text="Check file types to allow. If none are checked, all image types will be downloaded."/>
                 </StackPanel>
         </GroupBox>
          
