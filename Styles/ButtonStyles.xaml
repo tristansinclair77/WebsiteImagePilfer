@@ -46,24 +46,32 @@
    <Setter Property="Width" Value="{StaticResource ButtonWidthExtraWide}"/>
     </Style>
     
-    <!-- Small Button (Height=25) -->
+    <!-- Small Button (Height=28) -->
     <Style x:Key="SmallButton" TargetType="Button" BasedOn="{StaticResource StandardButton}">
         <Setter Property="Height" Value="{StaticResource ButtonHeightSmall}"/>
+        <Setter Property="Padding" Value="6,3,6,3"/>
+        <Setter Property="MinHeight" Value="28"/>
     </Style>
     
     <!-- Small Wide Button -->
     <Style x:Key="SmallWideButton" TargetType="Button" BasedOn="{StaticResource WideButton}">
         <Setter Property="Height" Value="{StaticResource ButtonHeightSmall}"/>
+        <Setter Property="Padding" Value="6,3,6,3"/>
+      <Setter Property="MinHeight" Value="28"/>
     </Style>
     
     <!-- Small Narrow Button -->
  <Style x:Key="SmallNarrowButton" TargetType="Button" BasedOn="{StaticResource NarrowButton}">
         <Setter Property="Height" Value="{StaticResource ButtonHeightSmall}"/>
+        <Setter Property="Padding" Value="6,3,6,3"/>
+        <Setter Property="MinHeight" Value="28"/>
     </Style>
     
-    <!-- Tiny Button (Height=22) -->
+    <!-- Tiny Button (Height=26) -->
     <Style x:Key="TinyButton" TargetType="Button" BasedOn="{StaticResource StandardButton}">
         <Setter Property="Height" Value="{StaticResource ButtonHeightTiny}"/>
+        <Setter Property="Padding" Value="5,3,5,3"/>
+        <Setter Property="MinHeight" Value="26"/>
     </Style>
     
     <!-- Primary Action Button (Blue) -->

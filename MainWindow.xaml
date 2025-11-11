@@ -22,153 +22,153 @@ xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         </Grid.RowDefinitions>
     
         <!-- URL Input Row -->
-        <Grid Grid.Row="0" Margin="{StaticResource MarginBottomStandard}">
+        <Grid Grid.Row="0" Margin="{StaticResource SectionMarginBottom}">
      <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*"/>
-             <ColumnDefinition Width="Auto"/>
+     <ColumnDefinition Width="Auto"/>
    <ColumnDefinition Width="Auto"/>
      <ColumnDefinition Width="Auto"/>
 <ColumnDefinition Width="Auto"/>
    <ColumnDefinition Width="Auto"/>
-          </Grid.ColumnDefinitions>
+       </Grid.ColumnDefinitions>
    
          <TextBox x:Name="UrlTextBox" 
          Grid.Column="0"
-            Style="{StaticResource StandardTextBox}"
-         Margin="{StaticResource MarginRightStandard}"
+    Style="{StaticResource StandardTextBox}"
+     Margin="{StaticResource MarginRightStandard}"
          Text="https://example.com"/>
-            
+    
        <Button x:Name="ScanOnlyButton" 
      Grid.Column="1"
-             Style="{StaticResource PrimaryButton}"
-                Content="Scan" 
+     Style="{StaticResource PrimaryButton}"
+              Content="Scan" 
    Margin="{StaticResource MarginRightSmall}"
           Click="ScanOnlyButton_Click"/>
    
        <CheckBox x:Name="FastScanCheckBox"
-             Grid.Column="2"
+     Grid.Column="2"
     Content="Fast"
-      VerticalAlignment="Center"
-       Margin="{StaticResource MarginRightStandard}"
+   VerticalAlignment="Center"
+    Margin="{StaticResource MarginRightStandard}"
           ToolTip="Fast: Quick scan (5s wait)&#x0a;Unchecked: Thorough scan (waits for all lazy-loaded images)"/>
 
           <Button x:Name="DownloadButton" 
-     Grid.Column="3"
+  Grid.Column="3"
     Style="{StaticResource PrimaryWideButton}"
          Content="Download" 
-        Margin="{StaticResource MarginRightSmall}"
+    Margin="{StaticResource MarginRightSmall}"
         IsEnabled="False"
-                 Click="DownloadButton_Click"
-          ToolTip="Download all ready images"/>
+      Click="DownloadButton_Click"
+  ToolTip="Download all ready images"/>
        
-            <Button x:Name="DownloadSelectedButton" 
+     <Button x:Name="DownloadSelectedButton" 
            Grid.Column="4"
          Style="{StaticResource PrimaryExtraWideButton}"
      Content="Download Selected" 
-           Margin="{StaticResource MarginRightSmall}"
-       IsEnabled="False"
+  Margin="{StaticResource MarginRightSmall}"
+     IsEnabled="False"
 Click="DownloadSelectedButton_Click"
-        ToolTip="Download only selected images"/>
-            
+  ToolTip="Download only selected images"/>
+        
      <Button x:Name="CancelButton" 
     Grid.Column="5"
    Style="{StaticResource StandardButton}"
   Content="Cancel" 
            IsEnabled="False"
-            Click="CancelButton_Click"/>
+     Click="CancelButton_Click"/>
         </Grid>
         
         <!-- Progress Bar -->
         <ProgressBar x:Name="DownloadProgress" 
-              Grid.Row="1"
-         Style="{StaticResource StandardProgressBar}"
-    Value="0"/>
+            Grid.Row="1"
+ Style="{StaticResource StandardProgressBar}"
+  Value="0"/>
         
     <!-- Folder Selection -->
-   <Grid Grid.Row="2" Margin="{StaticResource MarginBottomStandard}">
+   <Grid Grid.Row="2" Margin="{StaticResource SectionMarginBottom}" MinHeight="{StaticResource RowHeightSmall}">
    <Grid.ColumnDefinitions>
  <ColumnDefinition Width="Auto"/>
-     <ColumnDefinition Width="*"/>
-             <ColumnDefinition Width="Auto"/>
+   <ColumnDefinition Width="*"/>
      <ColumnDefinition Width="Auto"/>
+<ColumnDefinition Width="Auto"/>
           <ColumnDefinition Width="Auto"/>
-         <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
+     <ColumnDefinition Width="Auto"/>
+             <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
  
 <TextBlock Grid.Column="0" 
-       Style="{StaticResource LabelText}"
+     Style="{StaticResource LabelText}"
      Text="Save to:"/>
    
-       <TextBox x:Name="FolderTextBox" 
+<TextBox x:Name="FolderTextBox" 
    Grid.Column="1"
-      Style="{StaticResource SmallTextBox}"
+ Style="{StaticResource SmallTextBox}"
   Margin="{StaticResource MarginRightStandard}"
     IsReadOnly="True"/>
        
    <Button x:Name="BrowseButton" 
-              Grid.Column="2"
-        Style="{StaticResource SmallButton}"
+     Grid.Column="2"
+Style="{StaticResource SmallButton}"
              Content="Browse..." 
-         Margin="{StaticResource MarginRightSmall}"
+  Margin="{StaticResource MarginRightMedium}"
    Click="BrowseButton_Click"/>
-      
+   
             <Button x:Name="UpFolderButton" 
            Grid.Column="3"
-    Style="{StaticResource SmallNarrowButton}"
-        Content="Up ▲" 
-               Margin="{StaticResource MarginRightSmall}"
+ Style="{StaticResource SmallNarrowButton}"
+  Content="Up ▲" 
+               Margin="{StaticResource MarginRightMedium}"
       Click="UpFolderButton_Click"
        ToolTip="Go up one folder level"/>
-         
+      
      <Button x:Name="NewFolderButton" 
   Grid.Column="4"
-         Style="{StaticResource SmallButton}"
-       Content="New Folder" 
-Margin="{StaticResource MarginRightSmall}"
-           Click="NewFolderButton_Click"
-            ToolTip="Create a new folder in the current location"/>
+ Style="{StaticResource SmallButton}"
+   Content="New Folder" 
+Margin="{StaticResource MarginRightMedium}"
+   Click="NewFolderButton_Click"
+        ToolTip="Create a new folder in the current location"/>
         
-   <Button x:Name="OpenFolderButton" 
+<Button x:Name="OpenFolderButton" 
     Grid.Column="5"
-       Style="{StaticResource SmallButton}"
-        Content="Open Folder" 
-       Margin="{StaticResource MarginRightSmall}"
+Style="{StaticResource SmallButton}"
+    Content="Open Folder" 
+       Margin="{StaticResource MarginRightMedium}"
      Click="OpenFolderButton_Click"
         ToolTip="Open the download folder in File Explorer"/>
-            
-            <Button x:Name="SettingsButton" 
-          Grid.Column="6"
-               Style="{StaticResource SmallButton}"
-          Content="Settings..." 
-           Click="SettingsButton_Click"/>
-        </Grid>
+   
+  <Button x:Name="SettingsButton" 
+ Grid.Column="6"
+      Style="{StaticResource SmallButton}"
+    Content="Settings..." 
+  Click="SettingsButton_Click"/>
+  </Grid>
         
         <!-- Status Filter Section -->
         <Expander Grid.Row="3" 
-                Style="{StaticResource StandardExpander}"
+        Style="{StaticResource StandardExpander}"
    Header="Status Filters" 
 IsExpanded="True">
     <Border Style="{StaticResource FilterBorder}">
          <WrapPanel Orientation="Horizontal">
-            <CheckBox x:Name="FilterReadyCheckBox" 
-          Style="{StaticResource FilterCheckBox}"
+   <CheckBox x:Name="FilterReadyCheckBox" 
+ Style="{StaticResource FilterCheckBox}"
     Content="Ready" 
       IsChecked="True"
   Checked="StatusFilter_Changed"
-          Unchecked="StatusFilter_Changed"/>
-          <CheckBox x:Name="FilterDoneCheckBox" 
-        Style="{StaticResource FilterCheckBox}"
-               Content="✓ Done" 
-             IsChecked="True"
+  Unchecked="StatusFilter_Changed"/>
+  <CheckBox x:Name="FilterDoneCheckBox" 
+      Style="{StaticResource FilterCheckBox}"
+     Content="✓ Done" 
+    IsChecked="True"
     Checked="StatusFilter_Changed"
-               Unchecked="StatusFilter_Changed"/>
+    Unchecked="StatusFilter_Changed"/>
        <CheckBox x:Name="FilterBackupCheckBox" 
-     Style="{StaticResource FilterCheckBox}"
+  Style="{StaticResource FilterCheckBox}"
    Content="✓ Backup" 
    IsChecked="True"
-         Checked="StatusFilter_Changed"
-               Unchecked="StatusFilter_Changed"/>
+      Checked="StatusFilter_Changed"
+       Unchecked="StatusFilter_Changed"/>
 <CheckBox x:Name="FilterDuplicateCheckBox" 
   Style="{StaticResource FilterCheckBox}"
      Content="⊘ Duplicate" 
@@ -176,41 +176,42 @@ IsExpanded="True">
      Checked="StatusFilter_Changed"
     Unchecked="StatusFilter_Changed"/>
           <CheckBox x:Name="FilterFailedCheckBox" 
-               Style="{StaticResource FilterCheckBox}"
-                    Content="✗ Failed" 
+             Style="{StaticResource FilterCheckBox}"
+       Content="✗ Failed" 
     IsChecked="True"
-       Checked="StatusFilter_Changed"
+   Checked="StatusFilter_Changed"
         Unchecked="StatusFilter_Changed"/>
      <CheckBox x:Name="FilterSkippedCheckBox" 
      Style="{StaticResource FilterCheckBox}"
  Content="⊘ Skipped" 
-          IsChecked="True"
+   IsChecked="True"
           Checked="StatusFilter_Changed"
-               Unchecked="StatusFilter_Changed"/>
-             <CheckBox x:Name="FilterCancelledCheckBox" 
+Unchecked="StatusFilter_Changed"/>
+  <CheckBox x:Name="FilterCancelledCheckBox" 
  Style="{StaticResource FilterCheckBox}"
-           Content="⊘ Cancelled" 
-                  IsChecked="True"
-       Checked="StatusFilter_Changed"
+   Content="⊘ Cancelled" 
+           IsChecked="True"
+ Checked="StatusFilter_Changed"
       Unchecked="StatusFilter_Changed"/>
      <CheckBox x:Name="FilterDownloadingCheckBox" 
 Style="{StaticResource FilterCheckBox}"
       Content="Downloading..." 
-        IsChecked="True"
+     IsChecked="True"
    Checked="StatusFilter_Changed"
-      Unchecked="StatusFilter_Changed"/>
- <Separator Width="10" Opacity="0"/>
+   Unchecked="StatusFilter_Changed"/>
+ <Separator Width="20" Opacity="0" Margin="0,3,0,3"/>
     <Button x:Name="SelectAllStatusButton" 
    Style="{StaticResource TinyButton}"
-            Content="Select All" 
-      Margin="{StaticResource MarginRightSmall}"
+   Content="Select All" 
+  Margin="{StaticResource MarginFilterItem}"
              Click="SelectAllStatus_Click"/>
-            <Button x:Name="ClearAllStatusButton" 
-     Style="{StaticResource TinyButton}"
-          Content="Clear All" 
-        Click="ClearAllStatus_Click"/>
-        </WrapPanel>
-            </Border>
+  <Button x:Name="ClearAllStatusButton" 
+  Style="{StaticResource TinyButton}"
+    Content="Clear All"
+          Margin="{StaticResource MarginFilterItem}"
+     Click="ClearAllStatus_Click"/>
+     </WrapPanel>
+        </Border>
         </Expander>
  
       <!-- Image List -->
@@ -222,104 +223,108 @@ Style="{StaticResource FilterCheckBox}"
      MouseDoubleClick="ImageList_MouseDoubleClick">
  <ListView.ContextMenu>
       <ContextMenu>
-                <MenuItem Header="Download (Force)" Click="ContextMenu_Download_Click" />
+       <MenuItem Header="Download (Force)" Click="ContextMenu_Download_Click" />
   <MenuItem Header="Reload Preview" Click="ContextMenu_ReloadPreview_Click" />
       <Separator />
         <MenuItem Header="Cancel Download" Click="ContextMenu_Cancel_Click" />
        </ContextMenu>
   </ListView.ContextMenu>
       <ListView.View>
-         <GridView>
-               <GridViewColumn Header="#" Width="{StaticResource ColumnWidthTiny}">
-        <GridViewColumn.CellTemplate>
+  <GridView>
+        <GridViewColumn Header="#" Width="{StaticResource ColumnWidthTiny}">
+     <GridViewColumn.CellTemplate>
   <DataTemplate>
  <TextBlock Text="{Binding RelativeSource={RelativeSource AncestorType=ListViewItem}, 
       Converter={StaticResource IndexConverter}}"
        HorizontalAlignment="Center"/>
   </DataTemplate>
  </GridViewColumn.CellTemplate>
-            </GridViewColumn>
+   </GridViewColumn>
   <GridViewColumn x:Name="PreviewColumn" Header="Preview" Width="{StaticResource ColumnWidthMedium}">
  <GridViewColumn.CellTemplate>
    <DataTemplate>
-     <Image Source="{Binding PreviewImage}" 
+<Image Source="{Binding PreviewImage}" 
           MaxWidth="{Binding Path=ActualWidth, RelativeSource={RelativeSource AncestorType=GridViewColumn}}" 
-            Stretch="Uniform"
-          Margin="{StaticResource MarginTiny}"
+       Stretch="Uniform"
+      Margin="{StaticResource MarginSmall}"
      HorizontalAlignment="Center"
-   VerticalAlignment="Center"
+ VerticalAlignment="Center"
   RenderOptions.BitmapScalingMode="Fant"
           UseLayoutRounding="True"
-                  SnapsToDevicePixels="True"/>
-           </DataTemplate>
-        </GridViewColumn.CellTemplate>
+          SnapsToDevicePixels="True"/>
+     </DataTemplate>
+     </GridViewColumn.CellTemplate>
         </GridViewColumn>
-               <GridViewColumn Header="Status" Width="{StaticResource ColumnWidthNarrow}">
-               <GridViewColumn.CellTemplate>
-       <DataTemplate>
-       <TextBlock Text="{Binding Status}"/>
+            <GridViewColumn Header="Status" Width="{StaticResource ColumnWidthNarrow}">
+         <GridViewColumn.CellTemplate>
+ <DataTemplate>
+    <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Padding="3"/>
      </DataTemplate>
            </GridViewColumn.CellTemplate>
   </GridViewColumn>
-         <GridViewColumn Header="Image URL" Width="{StaticResource ColumnWidthExtraWide}">
-        <GridViewColumn.CellTemplate>
+<GridViewColumn Header="Image URL" Width="{StaticResource ColumnWidthExtraWide}">
+     <GridViewColumn.CellTemplate>
    <DataTemplate>
     <TextBlock Text="{Binding Url}" 
-            TextTrimming="CharacterEllipsis" 
+ TextTrimming="CharacterEllipsis" 
+   VerticalAlignment="Center"
+  Padding="3"
   ToolTip="{Binding Url}"/>
       </DataTemplate>
-             </GridViewColumn.CellTemplate>
-         </GridViewColumn>
-      <GridViewColumn Header="Filename" Width="{StaticResource ColumnWidthMedium}">
-          <GridViewColumn.CellTemplate>
+  </GridViewColumn.CellTemplate>
+      </GridViewColumn>
+   <GridViewColumn Header="Filename" Width="{StaticResource ColumnWidthMedium}">
+    <GridViewColumn.CellTemplate>
   <DataTemplate>
-           <TextBlock Text="{Binding FileName}"/>
+      <TextBlock Text="{Binding FileName}" VerticalAlignment="Center" Padding="3"/>
                </DataTemplate>
      </GridViewColumn.CellTemplate>
    </GridViewColumn>
    <GridViewColumn Header="Error" Width="{StaticResource ColumnWidthWide}">
  <GridViewColumn.CellTemplate>
-               <DataTemplate>
+      <DataTemplate>
      <TextBlock Style="{StaticResource ErrorText}"
        Text="{Binding ErrorMessage}" 
-             ToolTip="{Binding ErrorMessage}"/>
-       </DataTemplate>
+             VerticalAlignment="Center"
+         Padding="3"
+     ToolTip="{Binding ErrorMessage}"/>
+    </DataTemplate>
          </GridViewColumn.CellTemplate>
         </GridViewColumn>
-          </GridView>
+  </GridView>
     </ListView.View>
  </ListView>
-        
+      
         <!-- Pagination Controls -->
-        <Grid Grid.Row="5" Height="{StaticResource ButtonHeightSmall}" Margin="{StaticResource MarginBottomSmall}">
-        <Grid.ColumnDefinitions>
+      <Grid Grid.Row="5" MinHeight="{StaticResource RowHeightSmall}" Margin="{StaticResource MarginBottomStandard}">
+  <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*"/>
-           <ColumnDefinition Width="Auto"/>
-             <ColumnDefinition Width="Auto"/>
+      <ColumnDefinition Width="Auto"/>
     <ColumnDefinition Width="Auto"/>
-              <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+    <ColumnDefinition Width="Auto"/>
+   <ColumnDefinition Width="*"/>
+     </Grid.ColumnDefinitions>
    
       <Button x:Name="PrevPageButton" 
-           Grid.Column="1"
+  Grid.Column="1"
        Style="{StaticResource SmallButton}"
           Content="◄ Previous" 
-            Margin="{StaticResource MarginRightStandard}"
+       Margin="{StaticResource MarginRightStandard}"
   Click="PrevPageButton_Click"
           IsEnabled="False"/>
           
    <TextBlock x:Name="PageInfoText"
-         Grid.Column="2"
+    Grid.Column="2"
        Style="{StaticResource PageInfoText}"
   Text="Page 1 of 1"/>
       
-            <Button x:Name="NextPageButton" 
+<Button x:Name="NextPageButton" 
          Grid.Column="3"
-              Style="{StaticResource SmallButton}"
-       Content="Next ►" 
+  Style="{StaticResource SmallButton}"
+Content="Next ►" 
   Margin="{StaticResource MarginRightStandard}"
-                    Click="NextPageButton_Click"
-                IsEnabled="False"/>
+        Click="NextPageButton_Click"
+        IsEnabled="False"/>
         </Grid>
         
   <!-- Status Bar -->

@@ -10,14 +10,15 @@
         ResizeMode="CanResize">
     <Grid Margin="{StaticResource PaddingLarge}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-         <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
          <RowDefinition Height="Auto"/>
    </Grid.RowDefinitions>
-  
+
         <TextBlock Grid.Row="0" 
       Style="{StaticResource HeaderText}"
-   Text="Download Settings"/>
+   Text="Download Settings"
+         Margin="{StaticResource SectionMarginBottom}"/>
     
       <!-- Add ScrollViewer to make content scrollable -->
      <ScrollViewer Grid.Row="1" 
