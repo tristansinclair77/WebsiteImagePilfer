@@ -28,6 +28,14 @@ namespace WebsiteImagePilfer
             
             // New property for file type filtering
             public List<string> AllowedFileTypes { get; set; } = new List<string>();
+            
+            // Thorough scan options
+            public bool ThoroughScan_UseSelenium { get; set; } = true;
+            public bool ThoroughScan_CheckBackgroundImages { get; set; } = true;
+            public bool ThoroughScan_CheckDataAttributes { get; set; } = true;
+            public bool ThoroughScan_CheckScriptTags { get; set; } = true;
+            public bool ThoroughScan_CheckShadowDOM { get; set; } = false;
+            public bool ThoroughScan_SaveDebugFiles { get; set; } = false;
 
             public bool IsValid(out string? validationError)
             {

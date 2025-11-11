@@ -183,6 +183,33 @@ Grid.Column="1"
   Text="Controls how many images are shown per page in the list view"/>
              </StackPanel>
      </GroupBox>
+     
+     <!-- Thorough Scan Options -->
+     <GroupBox Header="Thorough Scan Options" Style="{StaticResource StandardGroupBox}">
+                <StackPanel Margin="{StaticResource PaddingStandard}">
+                    <CheckBox x:Name="ThoroughScan_UseSeleniumCheckBox" 
+                              Style="{StaticResource SimpleCheckBox}"
+                              Content="Use browser automation (required for JavaScript-heavy sites)"/>
+                    <CheckBox x:Name="ThoroughScan_CheckBackgroundImagesCheckBox" 
+                              Style="{StaticResource SimpleCheckBox}"
+                              Content="Check CSS background-image properties"/>
+                    <CheckBox x:Name="ThoroughScan_CheckDataAttributesCheckBox" 
+                              Style="{StaticResource SimpleCheckBox}"
+                              Content="Check lazy-load data attributes (data-src, etc.)"/>
+                    <CheckBox x:Name="ThoroughScan_CheckScriptTagsCheckBox" 
+                              Style="{StaticResource SimpleCheckBox}"
+                              Content="Search script tags for image URLs (slower)"/>
+                    <CheckBox x:Name="ThoroughScan_CheckShadowDOMCheckBox" 
+                              Style="{StaticResource SimpleCheckBox}"
+                              Content="Check Shadow DOM (experimental)"/>
+                    <CheckBox x:Name="ThoroughScan_SaveDebugFilesCheckBox" 
+                              Style="{StaticResource SimpleCheckBox}"
+                              Content="Save HTML source and screenshot for debugging"/>
+                    <TextBlock Style="{StaticResource HelpText}"
+                              Margin="{StaticResource MarginTopStandard}"
+                              Text="Uncheck options to speed up thorough scans. Fast scan ignores all these options."/>
+                </StackPanel>
+            </GroupBox>
      </StackPanel>
    </ScrollViewer>
         

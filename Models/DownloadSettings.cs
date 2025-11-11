@@ -21,6 +21,14 @@ namespace WebsiteImagePilfer.Models
         public int MaxImagesToScan { get; set; } = 20;
         public bool LoadPreviews { get; set; } = true;
         public int ItemsPerPage { get; set; } = 50;
+        
+        // Thorough scan options - each adds a layer of detection
+        public bool ThoroughScan_UseSelenium { get; set; } = true;
+        public bool ThoroughScan_CheckBackgroundImages { get; set; } = true;
+        public bool ThoroughScan_CheckDataAttributes { get; set; } = true;
+        public bool ThoroughScan_CheckScriptTags { get; set; } = true;
+        public bool ThoroughScan_CheckShadowDOM { get; set; } = false;
+        public bool ThoroughScan_SaveDebugFiles { get; set; } = false;
 
         // Load settings from portable JSON asynchronously
         public async Task LoadFromPortableSettingsAsync()
@@ -34,6 +42,14 @@ namespace WebsiteImagePilfer.Models
             LimitScanCount = appSettings.LimitScanCount;
             MaxImagesToScan = appSettings.MaxImagesToScan;
             ItemsPerPage = appSettings.ItemsPerPage;
+            
+            // Load thorough scan options
+            ThoroughScan_UseSelenium = appSettings.ThoroughScan_UseSelenium;
+            ThoroughScan_CheckBackgroundImages = appSettings.ThoroughScan_CheckBackgroundImages;
+            ThoroughScan_CheckDataAttributes = appSettings.ThoroughScan_CheckDataAttributes;
+            ThoroughScan_CheckScriptTags = appSettings.ThoroughScan_CheckScriptTags;
+            ThoroughScan_CheckShadowDOM = appSettings.ThoroughScan_CheckShadowDOM;
+            ThoroughScan_SaveDebugFiles = appSettings.ThoroughScan_SaveDebugFiles;
             
             // Load new AllowedFileTypes or migrate from legacy settings
             if (appSettings.AllowedFileTypes != null && appSettings.AllowedFileTypes.Count > 0)
@@ -72,6 +88,13 @@ namespace WebsiteImagePilfer.Models
                 MaxImagesToScan = MaxImagesToScan,
                 ItemsPerPage = ItemsPerPage,
                 AllowedFileTypes = AllowedFileTypes.ToList(),
+                // Thorough scan options
+                ThoroughScan_UseSelenium = ThoroughScan_UseSelenium,
+                ThoroughScan_CheckBackgroundImages = ThoroughScan_CheckBackgroundImages,
+                ThoroughScan_CheckDataAttributes = ThoroughScan_CheckDataAttributes,
+                ThoroughScan_CheckScriptTags = ThoroughScan_CheckScriptTags,
+                ThoroughScan_CheckShadowDOM = ThoroughScan_CheckShadowDOM,
+                ThoroughScan_SaveDebugFiles = ThoroughScan_SaveDebugFiles,
                 // Keep legacy properties for backward compatibility
                 FilterJpgOnly = AllowedFileTypes.Contains(".jpg") || AllowedFileTypes.Contains(".jpeg"),
                 FilterPngOnly = AllowedFileTypes.Contains(".png")

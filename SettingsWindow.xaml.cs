@@ -28,6 +28,14 @@ namespace WebsiteImagePilfer
             MaxImagesSlider.Value = _settings.MaxImagesToScan;
             LoadPreviewsCheckBox.IsChecked = _settings.LoadPreviews;
             ItemsPerPageSlider.Value = _settings.ItemsPerPage;
+            
+            // Load thorough scan options
+            ThoroughScan_UseSeleniumCheckBox.IsChecked = _settings.ThoroughScan_UseSelenium;
+            ThoroughScan_CheckBackgroundImagesCheckBox.IsChecked = _settings.ThoroughScan_CheckBackgroundImages;
+            ThoroughScan_CheckDataAttributesCheckBox.IsChecked = _settings.ThoroughScan_CheckDataAttributes;
+            ThoroughScan_CheckScriptTagsCheckBox.IsChecked = _settings.ThoroughScan_CheckScriptTags;
+            ThoroughScan_CheckShadowDOMCheckBox.IsChecked = _settings.ThoroughScan_CheckShadowDOM;
+            ThoroughScan_SaveDebugFilesCheckBox.IsChecked = _settings.ThoroughScan_SaveDebugFiles;
         }
 
         private void OkButton_Click(object sender, RoutedEventArgs e)
@@ -62,6 +70,14 @@ namespace WebsiteImagePilfer
             _settings.MaxImagesToScan = (int)MaxImagesSlider.Value;
             _settings.LoadPreviews = LoadPreviewsCheckBox.IsChecked.GetValueOrDefault();
             _settings.ItemsPerPage = (int)ItemsPerPageSlider.Value;
+            
+            // Save thorough scan options
+            _settings.ThoroughScan_UseSelenium = ThoroughScan_UseSeleniumCheckBox.IsChecked.GetValueOrDefault();
+            _settings.ThoroughScan_CheckBackgroundImages = ThoroughScan_CheckBackgroundImagesCheckBox.IsChecked.GetValueOrDefault();
+            _settings.ThoroughScan_CheckDataAttributes = ThoroughScan_CheckDataAttributesCheckBox.IsChecked.GetValueOrDefault();
+            _settings.ThoroughScan_CheckScriptTags = ThoroughScan_CheckScriptTagsCheckBox.IsChecked.GetValueOrDefault();
+            _settings.ThoroughScan_CheckShadowDOM = ThoroughScan_CheckShadowDOMCheckBox.IsChecked.GetValueOrDefault();
+            _settings.ThoroughScan_SaveDebugFiles = ThoroughScan_SaveDebugFilesCheckBox.IsChecked.GetValueOrDefault();
 
             // No validation needed - all combinations are now valid
             // If no file types are checked, all file types will be allowed

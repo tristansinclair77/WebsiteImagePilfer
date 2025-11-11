@@ -99,10 +99,13 @@ namespace WebsiteImagePilfer.Constants
             { "_800x800", "_small", "_medium", "_thumb", "_preview", "-thumb", "-preview" };
 
             public static readonly string[] Attributes = 
-            { "src", "data-src", "data-lazy-src", "data-original", "data-file" };
+            { "src", "data-src", "data-lazy-src", "data-original", "data-file", "srcset", "data-srcset", "data-url", "data-image" };
 
             public static readonly string[] Extensions = 
             { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp" };
+            
+            public static readonly string[] BackgroundImagePatterns = 
+            { "background-image:", "background:" };
         }
 
         /// <summary>

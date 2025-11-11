@@ -35,7 +35,10 @@ namespace WebsiteImagePilfer.Services
 
                 // Use existing filename or extract from URL
                 if (string.IsNullOrEmpty(item.FileName) || item.FileName.StartsWith("image_", StringComparison.Ordinal))
-                    item.FileName = FileNameExtractor.ExtractFromUrl(urlToDownload);
+                {
+                    // Try to get filename with content type detection for URLs without extensions
+                    item.FileName = await FileNameExtractor.ExtractFromUrlWithContentTypeAsync(urlToDownload, _httpClient, cancellationToken).ConfigureAwait(false);
+                }
 
                 // Check file type filters
                 if (!PassesFileTypeFilter(item.FileName, out string? filterReason))
