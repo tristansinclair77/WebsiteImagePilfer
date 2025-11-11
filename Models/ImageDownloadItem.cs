@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Media.Imaging;
 
 namespace WebsiteImagePilfer.Models
@@ -68,7 +69,18 @@ namespace WebsiteImagePilfer.Models
             return true;
         }
 
-        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            // Marshal PropertyChanged events to the UI thread to prevent cross-thread collection exceptions
+            if (Application.Current?.Dispatcher.CheckAccess() == false)
+            {
+                Application.Current.Dispatcher.BeginInvoke(() =>
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName)));
+            }
+            else
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            }
+        }
     }
 }
