@@ -24,40 +24,51 @@ using System.Globalization;
 using WebsiteImagePilfer.Models;
 using WebsiteImagePilfer.Services;
 using WebsiteImagePilfer.Helpers;
+using WebsiteImagePilfer.Converters;
 
 namespace WebsiteImagePilfer
 {
     public partial class MainWindow : Window
     {
- private const string STATUS_READY = "Ready";
-  private const string STATUS_DONE = "✓ Done";
-  private const string STATUS_BACKUP = "✓ Backup";
+        private const string STATUS_READY = "Ready";
+        private const string STATUS_DONE = "✓ Done";
+        private const string STATUS_BACKUP = "✓ Backup";
         private const string STATUS_DUPLICATE = "⊘ Duplicate";
         private const string STATUS_FAILED = "✗ Failed";
         private const string STATUS_SKIPPED = "⊘ Skipped";
-    private const string STATUS_CANCELLED = "⊘ Canceled";
-      private const string STATUS_DOWNLOADING = "Downloading...";
+ private const string STATUS_CANCELLED = "⊘ Canceled";
+ private const string STATUS_DOWNLOADING = "Downloading...";
         private const string STATUS_CHECKING = "Checking...";
-    private const string STATUS_FINDING_FULLRES = "Finding full-res...";
+        private const string STATUS_FINDING_FULLRES = "Finding full-res...";
 
         private readonly HttpClient _httpClient;
-  private ObservableCollection<ImageDownloadItem> _imageItems;
+        private ObservableCollection<ImageDownloadItem> _imageItems;
         private ObservableCollection<ImageDownloadItem> _currentPageItems;
-        private ObservableCollection<ImageDownloadItem> _filteredImageItems;
-    private string _downloadFolder;
-   private CancellationTokenSource? _cancellationTokenSource;
+ private ObservableCollection<ImageDownloadItem> _filteredImageItems;
+        private string _downloadFolder;
+        private CancellationTokenSource? _cancellationTokenSource;
       private DownloadSettings _settings;
-        private List<string> _scannedImageUrls;
-     public int _currentPage = 1;
-        public int _itemsPerPage = 50;
+    private List<string> _scannedImageUrls;
+        private int _currentPage = 1;
+        private int _itemsPerPage = 50;
         private int _totalPages = 1;
         private double _lastPreviewColumnWidth = 0;
-        private System.Timers.Timer? _columnResizeTimer;
-        
+     private System.Timers.Timer? _columnResizeTimer;
+    
         private ImageScanner? _imageScanner;
-        private ImageDownloader? _imageDownloader;
-private ImagePreviewLoader? _previewLoader;
-     private UIStateManager? _uiStateManager;
+private ImageDownloader? _imageDownloader;
+ private ImagePreviewLoader? _previewLoader;
+        private UIStateManager? _uiStateManager;
+
+        /// <summary>
+        /// Gets the current page number in the paginated view.
+        /// </summary>
+        public int CurrentPage => _currentPage;
+
+        /// <summary>
+        /// Gets the number of items displayed per page.
+  /// </summary>
+      public int ItemsPerPage => _itemsPerPage;
 
         public MainWindow()
         {
@@ -217,7 +228,7 @@ if (string.IsNullOrEmpty(url))
   var item = new ImageDownloadItem { Url = imageUrl, Status = STATUS_READY, FileName = fileName };
       _imageItems.Add(item);
 
-          if (_settings.LoadPreviews)
+           if (_settings.LoadPreviews)
         _ = LoadAndSetPreviewAsync(item);
 
            if (_settings.LimitScanCount && _imageItems.Count >= _settings.MaxImagesToScan)
@@ -736,13 +747,31 @@ if (settingsWindow.ShowDialog() == true)
      _totalPages = (int)Math.Ceiling((double)_filteredImageItems.Count / _itemsPerPage);
       if (_totalPages == 0) _totalPages = 1;
             if (_currentPage > _totalPages) _currentPage = _totalPages;
-       if (_currentPage < 1) _currentPage = 1;
+         if (_currentPage < 1) _currentPage = 1;
 
-         PageInfoText.Text = $"Page {_currentPage} of {_totalPages} ({_filteredImageItems.Count} filtered / {_imageItems.Count} total images)";
+     PageInfoText.Text = $"Page {_currentPage} of {_totalPages} ({_filteredImageItems.Count} filtered / {_imageItems.Count} total images)";
             PrevPageButton.IsEnabled = _currentPage > 1;
-            NextPageButton.IsEnabled = _currentPage < _totalPages;
-   LoadCurrentPage();
-   }
+    NextPageButton.IsEnabled = _currentPage < _totalPages;
+     
+       // Update the pagination context on the ListView to avoid repeated tree traversals in the converter
+        UpdateListViewPaginationContext();
+    
+LoadCurrentPage();
+        }
+
+        /// <summary>
+     /// Updates the cached pagination context on the ListView for optimal index converter performance.
+      /// </summary>
+     private void UpdateListViewPaginationContext()
+        {
+            var paginationContext = new PaginationContext
+          {
+         CurrentPage = _currentPage,
+                ItemsPerPage = _itemsPerPage
+    };
+        
+            ListViewHelper.SetPaginationContext(ImageList, paginationContext);
+  }
 
         private void LoadCurrentPage()
    {
