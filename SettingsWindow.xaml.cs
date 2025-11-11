@@ -27,19 +27,19 @@ namespace WebsiteImagePilfer
 
         private void OkButton_Click(object sender, RoutedEventArgs e)
         {
-            // Save settings
-            _settings.FilterBySize = FilterBySizeCheckBox.IsChecked == true;
+            // Save settings using GetValueOrDefault() for cleaner null handling
+            _settings.FilterBySize = FilterBySizeCheckBox.IsChecked.GetValueOrDefault();
             _settings.MinimumImageSize = (int)MinSizeSlider.Value;
-            _settings.ShowThumbnails = ShowThumbnailsCheckBox.IsChecked == true;
-            _settings.FilterJpgOnly = FilterJpgCheckBox.IsChecked == true;
-            _settings.FilterPngOnly = FilterPngCheckBox.IsChecked == true;
-            _settings.SkipFullResolutionCheck = SkipFullResCheckBox.IsChecked == true;
-            _settings.LimitScanCount = LimitScanCheckBox.IsChecked == true;
+            _settings.ShowThumbnails = ShowThumbnailsCheckBox.IsChecked.GetValueOrDefault();
+            _settings.FilterJpgOnly = FilterJpgCheckBox.IsChecked.GetValueOrDefault();
+            _settings.FilterPngOnly = FilterPngCheckBox.IsChecked.GetValueOrDefault();
+            _settings.SkipFullResolutionCheck = SkipFullResCheckBox.IsChecked.GetValueOrDefault();
+            _settings.LimitScanCount = LimitScanCheckBox.IsChecked.GetValueOrDefault();
             _settings.MaxImagesToScan = (int)MaxImagesSlider.Value;
-            _settings.LoadPreviews = LoadPreviewsCheckBox.IsChecked == true;
+            _settings.LoadPreviews = LoadPreviewsCheckBox.IsChecked.GetValueOrDefault();
             _settings.ItemsPerPage = (int)ItemsPerPageSlider.Value;
 
-            // Validate file type filters
+            // Validate file type filters - simplified validation
             if (_settings.FilterJpgOnly && _settings.FilterPngOnly)
             {
                 MessageBox.Show("You cannot select both JPG and PNG only filters. Please choose one or neither.", 
