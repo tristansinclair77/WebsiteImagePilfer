@@ -135,20 +135,22 @@ namespace WebsiteImagePilfer
         // Context menu opening handler - dynamically show/hide menu items
         private void ContextMenu_Opened(object sender, RoutedEventArgs e)
         {
-            if (sender is ContextMenu contextMenu && ImageList.SelectedItem is ImageDownloadItem item)
+            if (sender is ContextMenu contextMenu && ImageList.SelectedItems.Count > 0)
             {
-                // Show "Unignore" only if item is ignored, otherwise show "Ignore"
-                bool isIgnored = item.Status == Status.Ignored;
+                // Check if any selected item is ignored to show/hide appropriate menu items
+                bool anyIgnored = ImageList.SelectedItems.Cast<ImageDownloadItem>().Any(item => item.Status == Status.Ignored);
+                bool anyNotIgnored = ImageList.SelectedItems.Cast<ImageDownloadItem>().Any(item => item.Status != Status.Ignored);
                 
-                ContextMenu_Ignore.Visibility = isIgnored ? Visibility.Collapsed : Visibility.Visible;
-                ContextMenu_Unignore.Visibility = isIgnored ? Visibility.Visible : Visibility.Collapsed;
+                // Show both options if mixed selection, otherwise show only the relevant one
+                ContextMenu_Ignore.Visibility = anyNotIgnored ? Visibility.Visible : Visibility.Collapsed;
+                ContextMenu_Unignore.Visibility = anyIgnored ? Visibility.Visible : Visibility.Collapsed;
             }
         }
 
-        // Context menu event handlers - route to ViewModel commands
+        // Context menu event handlers - route to ViewModel commands for all selected items
         private void ContextMenu_Download_Click(object sender, RoutedEventArgs e)
         {
-            if (ImageList.SelectedItem is ImageDownloadItem item)
+            foreach (var item in ImageList.SelectedItems.Cast<ImageDownloadItem>().ToList())
             {
                 _viewModel.ForceDownloadSingleCommand.Execute(item);
             }
@@ -156,7 +158,7 @@ namespace WebsiteImagePilfer
 
         private void ContextMenu_ReloadPreview_Click(object sender, RoutedEventArgs e)
         {
-            if (ImageList.SelectedItem is ImageDownloadItem item)
+            foreach (var item in ImageList.SelectedItems.Cast<ImageDownloadItem>().ToList())
             {
                 _viewModel.ReloadPreviewCommand.Execute(item);
             }
@@ -164,7 +166,7 @@ namespace WebsiteImagePilfer
 
         private void ContextMenu_Cancel_Click(object sender, RoutedEventArgs e)
         {
-            if (ImageList.SelectedItem is ImageDownloadItem item)
+            foreach (var item in ImageList.SelectedItems.Cast<ImageDownloadItem>().ToList())
             {
                 _viewModel.CancelSingleCommand.Execute(item);
             }
@@ -172,17 +174,23 @@ namespace WebsiteImagePilfer
 
         private void ContextMenu_Ignore_Click(object sender, RoutedEventArgs e)
         {
-            if (ImageList.SelectedItem is ImageDownloadItem item)
+            foreach (var item in ImageList.SelectedItems.Cast<ImageDownloadItem>().ToList())
             {
-                _viewModel.IgnoreCommand.Execute(item);
+                if (item.Status != Status.Ignored)
+                {
+                    _viewModel.IgnoreCommand.Execute(item);
+                }
             }
         }
 
         private void ContextMenu_Unignore_Click(object sender, RoutedEventArgs e)
         {
-            if (ImageList.SelectedItem is ImageDownloadItem item)
+            foreach (var item in ImageList.SelectedItems.Cast<ImageDownloadItem>().ToList())
             {
-                _viewModel.UnignoreCommand.Execute(item);
+                if (item.Status == Status.Ignored)
+                {
+                    _viewModel.UnignoreCommand.Execute(item);
+                }
             }
         }
 
