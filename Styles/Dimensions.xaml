@@ -1,0 +1,55 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+          xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    
+    <!-- Button Dimensions -->
+    <sys:Double x:Key="ButtonHeightStandard">30</sys:Double>
+    <sys:Double x:Key="ButtonHeightSmall">25</sys:Double>
+    <sys:Double x:Key="ButtonHeightTiny">22</sys:Double>
+    <sys:Double x:Key="ButtonWidthNarrow">60</sys:Double>
+    <sys:Double x:Key="ButtonWidthStandard">80</sys:Double>
+    <sys:Double x:Key="ButtonWidthWide">100</sys:Double>
+    <sys:Double x:Key="ButtonWidthExtraWide">130</sys:Double>
+    
+    <!-- TextBox Dimensions -->
+    <sys:Double x:Key="TextBoxHeightStandard">30</sys:Double>
+    <sys:Double x:Key="TextBoxHeightSmall">25</sys:Double>
+    
+    <!-- Other Control Dimensions -->
+    <sys:Double x:Key="StatusBarHeight">25</sys:Double>
+  <sys:Double x:Key="ProgressBarHeight">20</sys:Double>
+    
+    <!-- Spacing -->
+    <Thickness x:Key="MarginTiny">2</Thickness>
+    <Thickness x:Key="MarginSmall">5</Thickness>
+  <Thickness x:Key="MarginStandard">10</Thickness>
+    <Thickness x:Key="MarginLarge">15</Thickness>
+    
+    <Thickness x:Key="PaddingSmall">5</Thickness>
+    <Thickness x:Key="PaddingStandard">10</Thickness>
+    <Thickness x:Key="PaddingLarge">15</Thickness>
+    
+    <!-- Standard Margin Patterns -->
+    <Thickness x:Key="MarginRightTiny">0,0,2,0</Thickness>
+    <Thickness x:Key="MarginRightSmall">0,0,5,0</Thickness>
+    <Thickness x:Key="MarginRightStandard">0,0,10,0</Thickness>
+    <Thickness x:Key="MarginRightLarge">0,0,15,0</Thickness>
+    
+    <Thickness x:Key="MarginBottomSmall">0,0,0,5</Thickness>
+    <Thickness x:Key="MarginBottomStandard">0,0,0,10</Thickness>
+    <Thickness x:Key="MarginBottomLarge">0,0,0,15</Thickness>
+    
+    <Thickness x:Key="MarginTopSmall">0,5,0,0</Thickness>
+    <Thickness x:Key="MarginTopStandard">0,10,0,0</Thickness>
+    
+    <!-- Specific Margin Combinations -->
+    <Thickness x:Key="MarginCheckBox">0,0,15,5</Thickness>
+    
+    <!-- GridViewColumn Widths -->
+    <sys:Double x:Key="ColumnWidthTiny">40</sys:Double>
+    <sys:Double x:Key="ColumnWidthNarrow">80</sys:Double>
+    <sys:Double x:Key="ColumnWidthMedium">150</sys:Double>
+    <sys:Double x:Key="ColumnWidthWide">280</sys:Double>
+    <sys:Double x:Key="ColumnWidthExtraWide">320</sys:Double>
+    
+</ResourceDictionary>
