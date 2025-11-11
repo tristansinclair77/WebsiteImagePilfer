@@ -13,10 +13,10 @@ namespace WebsiteImagePilfer.Models
         public bool LoadPreviews { get; set; } = true;
         public int ItemsPerPage { get; set; } = 50;
 
-        // Load settings from portable JSON
-        public void LoadFromPortableSettings()
+        // Load settings from portable JSON asynchronously
+        public async Task LoadFromPortableSettingsAsync()
         {
-            var appSettings = PortableSettingsManager.LoadSettings();
+            var appSettings = await PortableSettingsManager.LoadSettingsAsync().ConfigureAwait(false);
             FilterBySize = appSettings.FilterBySize;
             MinimumImageSize = appSettings.MinimumImageSize;
             ShowThumbnails = appSettings.ShowThumbnails;
@@ -29,8 +29,8 @@ namespace WebsiteImagePilfer.Models
             ItemsPerPage = appSettings.ItemsPerPage;
         }
 
-        // Save settings to portable JSON
-        public void SaveToPortableSettings(string downloadFolder, string lastUrl)
+        // Save settings to portable JSON asynchronously
+        public async Task SaveToPortableSettingsAsync(string downloadFolder, string lastUrl)
         {
             var appSettings = new PortableSettingsManager.AppSettings
             {
@@ -47,7 +47,18 @@ namespace WebsiteImagePilfer.Models
                 MaxImagesToScan = MaxImagesToScan,
                 ItemsPerPage = ItemsPerPage
             };
-            PortableSettingsManager.SaveSettings(appSettings);
+            await PortableSettingsManager.SaveSettingsAsync(appSettings).ConfigureAwait(false);
+        }
+
+        // Keep synchronous versions for backward compatibility
+        public void LoadFromPortableSettings()
+        {
+            LoadFromPortableSettingsAsync().GetAwaiter().GetResult();
+        }
+
+        public void SaveToPortableSettings(string downloadFolder, string lastUrl)
+        {
+            SaveToPortableSettingsAsync(downloadFolder, lastUrl).GetAwaiter().GetResult();
         }
     }
 }

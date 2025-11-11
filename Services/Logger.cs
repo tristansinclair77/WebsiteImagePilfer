@@ -29,10 +29,12 @@ namespace WebsiteImagePilfer.Services
  {
     if (!Directory.Exists(LogDirectory))
     Directory.CreateDirectory(LogDirectory);
-            }
-   catch
+    }
+   catch (Exception ex)
             {
  // If we can't create log directory, continue without file logging
+          // Use Debug.WriteLine as fallback since Logger.Error would create infinite recursion
+     System.Diagnostics.Debug.WriteLine($"[Logger] Failed to create log directory: {ex.Message}");
     }
         }
 
@@ -47,7 +49,7 @@ public static void Log(LogLevel level, string message, string? source = null, Ex
         {
         try
        {
-        var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+   var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
           var logEntry = $"[{timestamp}] [{level}] [{source ?? "App"}] {message}";
 
           if (ex != null)
@@ -56,12 +58,14 @@ public static void Log(LogLevel level, string message, string? source = null, Ex
          // Write to debug output (visible in debugger)
       System.Diagnostics.Debug.WriteLine(logEntry);
 
-       // Write to file (async, fire-and-forget)
+   // Write to file (async, fire-and-forget)
          Task.Run(() => WriteToFileAsync(logEntry));
        }
-      catch
+      catch (Exception logEx)
          {
    // Don't let logging errors crash the application
+     // Use Debug.WriteLine as last resort fallback
+    System.Diagnostics.Debug.WriteLine($"[Logger] Logging failed: {logEx.Message}");
    }
      }
 
@@ -98,15 +102,17 @@ public static void Log(LogLevel level, string message, string? source = null, Ex
  {
      await Task.Run(() =>
      {
-              lock (_lockObject)
+   lock (_lockObject)
          {
      File.AppendAllText(LogFilePath, logEntry + Environment.NewLine);
          }
      });
     }
-     catch
+     catch (Exception ex)
        {
-                // Silent failure - don't crash if file write fails
+  // Silent failure - don't crash if file write fails
+         // Use Debug.WriteLine as fallback
+   System.Diagnostics.Debug.WriteLine($"[Logger] Failed to write to log file: {ex.Message}");
          }
     }
 

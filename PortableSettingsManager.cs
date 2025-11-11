@@ -70,7 +70,7 @@ namespace WebsiteImagePilfer
             }
         }
 
-        public static AppSettings LoadSettings()
+        public static async Task<AppSettings> LoadSettingsAsync()
         {
             try
             {
@@ -80,7 +80,7 @@ namespace WebsiteImagePilfer
                     return new AppSettings();
                 }
 
-                string json = File.ReadAllText(SettingsFilePath);
+                string json = await File.ReadAllTextAsync(SettingsFilePath).ConfigureAwait(false);
                 var settings = JsonSerializer.Deserialize<AppSettings>(json);
 
                 if (settings == null)
@@ -121,7 +121,7 @@ namespace WebsiteImagePilfer
             }
         }
 
-        public static bool SaveSettings(AppSettings settings)
+        public static async Task<bool> SaveSettingsAsync(AppSettings settings)
         {
             if (settings == null)
             {
@@ -141,7 +141,7 @@ namespace WebsiteImagePilfer
             {
                 var options = new JsonSerializerOptions { WriteIndented = true };
                 string json = JsonSerializer.Serialize(settings, options);
-                File.WriteAllText(SettingsFilePath, json);
+                await File.WriteAllTextAsync(SettingsFilePath, json).ConfigureAwait(false);
                 Logger.Info($"Settings saved successfully to {SettingsFilePath}");
                 return true;
             }
@@ -165,6 +165,17 @@ namespace WebsiteImagePilfer
                 Logger.Error("Unexpected error saving settings", ex);
                 return false;
             }
+        }
+
+        // Keep synchronous versions for backward compatibility
+        public static AppSettings LoadSettings()
+        {
+            return LoadSettingsAsync().GetAwaiter().GetResult();
+        }
+
+        public static bool SaveSettings(AppSettings settings)
+        {
+            return SaveSettingsAsync(settings).GetAwaiter().GetResult();
         }
 
         public static string GetSettingsFilePath() => SettingsFilePath;

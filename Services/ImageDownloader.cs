@@ -73,8 +73,15 @@ await File.WriteAllBytesAsync(filePath, imageBytes, cancellationToken).Configure
 // Set thumbnail path if enabled
  if (_settings.ShowThumbnails)
     {
-try { item.ThumbnailPath = filePath; }
-   catch { /* Thumbnail generation failed, continue without it */ }
+  try 
+   { 
+    item.ThumbnailPath = filePath; 
+      }
+   catch (Exception ex)
+      { 
+         // Thumbnail generation failed - not critical, continue without it
+     Logger.Warning($"Failed to set thumbnail path for {item.FileName}: {ex.Message}");
+     }
      }
 
         item.Status = usedBackup ? Status.Backup : Status.Done;
@@ -119,9 +126,11 @@ catch (Exception ex)
        
    return (fullResUrl, false); // Found different full-res URL
  }
-       catch
+       catch (Exception ex)
    {
-    return (originalUrl, true); // Error finding full-res, use backup
+        // Error finding full-res - use backup URL
+        Logger.Warning($"Error finding full resolution URL for {originalUrl}, using backup: {ex.Message}");
+    return (originalUrl, true);
     }
 }
 
@@ -198,11 +207,13 @@ foreach (var pattern in Images.SizePatterns)
     using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(Network.HeadRequestTimeoutSeconds));
       using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
-      var response = await _httpClient.SendAsync(request, linkedCts.Token).ConfigureAwait(false);
+  var response = await _httpClient.SendAsync(request, linkedCts.Token).ConfigureAwait(false);
   return response.IsSuccessStatusCode;
 }
-    catch
+    catch (Exception ex)
   {
+   // URL test failed - assume URL doesn't exist
+      Logger.Debug($"URL existence test failed for {url}: {ex.Message}");
  return false;
   }
      }

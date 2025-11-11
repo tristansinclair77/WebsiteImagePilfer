@@ -25,10 +25,11 @@ namespace WebsiteImagePilfer.ViewModels
 private ImageDownloader _imageDownloader;  // Not readonly - needs to be recreated when settings change
       private readonly ImagePreviewLoader _previewLoader;
    
-    private CancellationTokenSource? _cancellationTokenSource;
+  private CancellationTokenSource? _cancellationTokenSource;
         private List<ImageDownloadItem>? _cachedReadyItems;
-      private int _cachedReadyItemsVersion;
+    private int _cachedReadyItemsVersion;
      private int _imageItemsVersion;
+        private int _selectedReadyCount = 0;  // Cache for selected ready items count
 
   private string _url = "https://example.com";
      private string _downloadFolder = "";
@@ -324,18 +325,33 @@ ImageItems = new ObservableCollection<ImageDownloadItem>();
 
          // Setup collection monitoring
      ImageItems.CollectionChanged += (s, e) =>
-  {
-    InvalidateReadyItemsCache();
- if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add ||
-          e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+        {
+            InvalidateReadyItemsCache();
+  
+          // Unsubscribe from removed items to prevent memory leaks
+            if (e.OldItems != null)
+    {
+          foreach (ImageDownloadItem item in e.OldItems)
+            item.PropertyChanged -= ImageItem_PropertyChanged;
+     }
+    
+        // Subscribe to new items
+        if (e.NewItems != null)
+            {
+    foreach (ImageDownloadItem item in e.NewItems)
+        item.PropertyChanged += ImageItem_PropertyChanged;
+            }
+       
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add ||
+        e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
           ApplyStatusFilter();
+        };
 
-         if (e.NewItems != null)
-  foreach (ImageDownloadItem item in e.NewItems)
-   item.PropertyChanged += ImageItem_PropertyChanged;
-};
-
-         SelectedItems.CollectionChanged += (s, e) => UpdateDownloadSelectedButtonState();
+         SelectedItems.CollectionChanged += (s, e) =>
+        {
+          RecalculateSelectedReadyCount();
+    UpdateDownloadSelectedButtonState();
+     };
 
    UpdatePagination();
         }
@@ -628,33 +644,41 @@ else
             {
    ShowInfo($"Image already downloaded: {item.FileName}", "Already Downloaded");
    return;
-          }
+   }
 
     var originalStatus = item.Status;
      item.Status = Status.Downloading;
 
          try
   {
-          await _imageDownloader.DownloadSingleItemAsync(item, CancellationToken.None);
+      // Use global cancellation token if available, otherwise use default
+     var cancellationToken = _cancellationTokenSource?.Token ?? default;
+      await _imageDownloader.DownloadSingleItemAsync(item, cancellationToken);
        if (item.Status == Status.Done)
        StatusText = $"Downloaded: {item.FileName}";
   }
+     catch (OperationCanceledException)
+        {
+   item.Status = Status.Cancelled;
+       item.ErrorMessage = "Cancelled by user";
+   StatusText = $"Cancelled download: {item.FileName}";
+        }
          catch (Exception ex)
    {
-      item.Status = Status.Failed;
+  item.Status = Status.Failed;
        item.ErrorMessage = ex.Message;
         ShowError($"Failed to download: {ex.Message}", "Download Error");
-            }
+   }
     }
 
 private async Task ReloadPreviewAsync(object? parameter)
         {
       if (parameter is not ImageDownloadItem item)
-     return;
+   return;
 
     if (!Settings.LoadPreviews)
  {
-        ShowInfo("Preview loading is disabled in Settings. Please enable 'Load preview images during scan' to use this feature.", "Preview Loading Disabled");
+      ShowInfo("Preview loading is disabled in Settings. Please enable 'Load preview images during scan' to use this feature.", "Preview Loading Disabled");
     return;
        }
 
@@ -664,7 +688,7 @@ private async Task ReloadPreviewAsync(object? parameter)
       item.PreviewImage = null;
 
       // Get the preview column width from the view (we'll need to pass this somehow)
-   var newPreview = await _previewLoader.LoadPreviewImageFromColumnWidthAsync(item.Url, 150); // Default width
+   var newPreview = await _previewLoader.LoadPreviewImageFromColumnWidthAsync(item.Url, 150).ConfigureAwait(false); // Default width
         if (newPreview != null)
         {
    item.PreviewImage = newPreview;
@@ -678,8 +702,8 @@ else
          }
    catch (Exception ex)
      {
-    StatusText = $"Error reloading preview: {ex.Message}";
-    ShowError($"Error reloading preview: {ex.Message}", "Preview Error");
+  StatusText = $"Error reloading preview: {ex.Message}";
+ ShowError($"Error reloading preview: {ex.Message}", "Preview Error");
          }
       }
 
@@ -778,16 +802,16 @@ if (item.Status == Status.Done) downloadedCount++;
         private async Task LoadAndSetPreviewAsync(ImageDownloadItem item)
     {
      try
-            {
+      {
      // Default preview width, will be updated if column width changes
-  var preview = await _previewLoader.LoadPreviewImageFromColumnWidthAsync(item.Url, 150);
+  var preview = await _previewLoader.LoadPreviewImageFromColumnWidthAsync(item.Url, 150).ConfigureAwait(false);
 if (preview != null)
  item.PreviewImage = preview;
  }
           catch (Exception ex)
  {
-       Logger.Error($"Failed to load preview for {item.Url}", ex);
-            }
+    Logger.Error($"Failed to load preview for {item.Url}", ex);
+     }
  }
 
   private void OpenDownloadedFile(ImageDownloadItem item)
@@ -879,7 +903,10 @@ IsNextPageEnabled = _currentPage < _totalPages;
         private void ImageItem_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
    {
 if (e.PropertyName == nameof(ImageDownloadItem.Status))
-    ApplyStatusFilter();
+     {
+ ApplyStatusFilter();
+        RecalculateSelectedReadyCount();
+    }
  }
 
       private void InvalidateReadyItemsCache()
@@ -900,9 +927,13 @@ _cachedReadyItems = null;
 
      private void UpdateDownloadSelectedButtonState()
       {
-      var readyCount = SelectedItems.Count(item => item.Status == Status.Ready);
-IsDownloadSelectedEnabled = readyCount > 0 && !IsCancelEnabled;
+      IsDownloadSelectedEnabled = _selectedReadyCount > 0 && !IsCancelEnabled;
   }
+
+     private void RecalculateSelectedReadyCount()
+        {
+      _selectedReadyCount = SelectedItems.Count(item => item.Status == Status.Ready);
+        }
 
     private void ReinitializeServices()
  {

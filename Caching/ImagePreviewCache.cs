@@ -93,7 +93,12 @@ _useDiskCache = false;
          {
     Logger.Error($"Failed to load from disk cache: {diskPath}", ex);
         // Delete corrupted cache file
-       try { File.Delete(diskPath); } catch { }
+       try { File.Delete(diskPath); } 
+       catch (Exception deleteEx)
+       { 
+           // File deletion failed - not critical
+           Logger.Warning($"Failed to delete corrupted cache file {diskPath}: {deleteEx.Message}");
+       }
            }
      }
     }
@@ -177,16 +182,18 @@ if (_useDiskCache)
  var bitmap = new BitmapImage();
        bitmap.BeginInit();
      bitmap.CacheOption = BitmapCacheOption.OnLoad;
-      bitmap.UriSource = new Uri(diskPath, UriKind.Absolute);
+    bitmap.UriSource = new Uri(diskPath, UriKind.Absolute);
   bitmap.DecodePixelWidth = decodeWidth;
-      bitmap.EndInit();
-    bitmap.Freeze();
+  bitmap.EndInit();
+  bitmap.Freeze();
       return bitmap;
     }
-         catch
-       {
-          return null;
-            }
+         catch (Exception ex)
+ {
+  // Failed to load bitmap from disk cache - will reload from network
+      Logger.Warning($"Failed to load bitmap from disk cache {diskPath}: {ex.Message}");
+ return null;
+      }
             }).ConfigureAwait(false);
         }
 

@@ -18,6 +18,14 @@ namespace WebsiteImagePilfer.Services
     {
         private readonly Action<string> _updateStatus;
 
+        // Static compiled regex for image URL extraction - improves performance by caching the pattern
+        private static readonly Lazy<Regex> _imageUrlRegex = new Lazy<Regex>(() =>
+        {
+            var extensions = string.Join("|", Images.Extensions.Select(e => e.TrimStart('.')));
+            var pattern = $@"https?://[^\s""'<>\\]+?\.(?:{extensions})(?:\?[^\s""'<>\\]*)?";
+            return new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        });
+
         public ImageScanner(Action<string> updateStatus) => _updateStatus = updateStatus;
 
         public async Task<List<string>> ScanForImagesAsync(string url, CancellationToken cancellationToken, bool useFastScan = false)
@@ -94,7 +102,7 @@ namespace WebsiteImagePilfer.Services
 
         private void LoadPageWithRetry(IWebDriver driver, string url)
         {
-            _updateStatus("Loading page with JavaScript...");
+            _updateStatus("Loading page with JavaScript ...");
 
             for (int retryCount = 0; retryCount < Scanning.MaxRetryCount; retryCount++)
             {
@@ -106,7 +114,7 @@ namespace WebsiteImagePilfer.Services
                 catch (WebDriverTimeoutException)
                 {
                     if (retryCount >= Scanning.MaxRetryCount - 1) throw;
-                    _updateStatus($"Page load timeout, retrying ({retryCount + 1}/{Scanning.MaxRetryCount})...");
+                    _updateStatus($"Page load timeout, retrying ({retryCount + 1}/{Scanning.MaxRetryCount}) ...");
                     Thread.Sleep(Scanning.RetryDelayMs);
                 }
             }
@@ -114,7 +122,7 @@ namespace WebsiteImagePilfer.Services
 
         private void PerformFastScan(IWebDriver driver, CancellationToken cancellationToken)
         {
-            _updateStatus("Fast scan: Waiting for images to load...");
+            _updateStatus("Fast scan: Waiting for images to load ...");
             Thread.Sleep(Scanning.FastScanWaitMs);
             ScrollPage(driver);
             Thread.Sleep(Scanning.RetryDelayMs);
@@ -122,7 +130,7 @@ namespace WebsiteImagePilfer.Services
 
         private void PerformThoroughScan(IWebDriver driver, HashSet<string> imageUrls, CancellationToken cancellationToken)
         {
-            _updateStatus("Thorough scan: Waiting for images to load...");
+            _updateStatus("Thorough scan: Waiting for images to load ...");
 
             int previousCount = 0;
             int stableCount = 0;
@@ -138,14 +146,14 @@ namespace WebsiteImagePilfer.Services
                 if (currentCount > previousCount)
                 {
                     stableCount = 0;
-                    _updateStatus($"Thorough scan: Found {currentCount} images so far, continuing...");
+                    _updateStatus($"Thorough scan: Found {currentCount} images so far, continuing ...");
                     previousCount = currentCount;
                     imageUrls.UnionWith(currentImages);
                 }
                 else
                 {
                     stableCount++;
-                    _updateStatus($"Thorough scan: Stable at {currentCount} images ({stableCount}/{Scanning.ThoroughScanMaxStableChecks} checks)...");
+                    _updateStatus($"Thorough scan: Stable at {currentCount} images ({stableCount}/{Scanning.ThoroughScanMaxStableChecks} checks) ...");
                 }
             }
         }
@@ -161,7 +169,11 @@ namespace WebsiteImagePilfer.Services
                 Thread.Sleep(Scanning.ScrollDelayMs);
                 js.ExecuteScript("window.scrollTo(0, 0);");
             }
-            catch { /* Scroll failed, continue anyway */ }
+            catch (Exception ex)
+            {
+                // Scroll failed - not critical, continue anyway
+                Logger.Warning($"Page scroll operation failed but continuing scan: {ex.Message}");
+            }
         }
 
         private HashSet<string> ExtractCurrentImages(IWebDriver driver, CancellationToken cancellationToken)
@@ -179,10 +191,18 @@ namespace WebsiteImagePilfer.Services
                         if (!string.IsNullOrEmpty(src) && !src.StartsWith("data:"))
                             currentImages.Add(src);
                     }
-                    catch { /* Skip invalid elements */ }
+                    catch (Exception ex)
+                    {
+                        // Skip invalid element - not critical
+                        Logger.Warning($"Failed to extract image attribute from element: {ex.Message}");
+                    }
                 }
             }
-            catch { /* Continue if extraction fails */ }
+            catch (Exception ex)
+            {
+                // Continue if extraction fails - not critical
+                Logger.Warning($"Failed to extract images from page but continuing: {ex.Message}");
+            }
 
             return currentImages;
         }
@@ -247,9 +267,8 @@ namespace WebsiteImagePilfer.Services
 
         private void ExtractFromRegex(string renderedHtml, HashSet<string> imageUrls, CancellationToken cancellationToken)
         {
-            var extensions = string.Join("|", Images.Extensions.Select(e => e.TrimStart('.')));
-            var imageUrlPattern = $@"https?://[^\s""'<>\\]+?\.(?:{extensions})(?:\?[^\s""'<>\\]*)?";
-            var matches = Regex.Matches(renderedHtml, imageUrlPattern, RegexOptions.IgnoreCase);
+            // Use cached compiled regex for better performance
+            var matches = _imageUrlRegex.Value.Matches(renderedHtml);
 
             foreach (Match match in matches)
             {
@@ -261,8 +280,19 @@ namespace WebsiteImagePilfer.Services
 
         private void CleanupWebDriver(IWebDriver? driver)
         {
-            try { driver?.Quit(); } catch { }
-            try { driver?.Dispose(); } catch { }
+            try { driver?.Quit(); } 
+            catch (Exception ex) 
+            { 
+                // Quit failed - try disposal anyway
+                Logger.Warning($"WebDriver quit failed during cleanup: {ex.Message}");
+            }
+            
+            try { driver?.Dispose(); } 
+            catch (Exception ex) 
+            { 
+                 // Disposal failed - nothing more we can do
+                Logger.Warning($"WebDriver disposal failed during cleanup: {ex.Message}");
+            }
         }
     }
 }

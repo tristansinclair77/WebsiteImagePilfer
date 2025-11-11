@@ -4,6 +4,8 @@ using System.Windows.Input;
 using System.ComponentModel;
 using WebsiteImagePilfer.ViewModels;
 using WebsiteImagePilfer.Models;
+using WebsiteImagePilfer.Constants;
+using static WebsiteImagePilfer.Constants.AppConstants;
 
 namespace WebsiteImagePilfer
 {
@@ -13,43 +15,52 @@ namespace WebsiteImagePilfer
     /// </summary>
     public partial class MainWindow : Window
   {
-        private readonly MainWindowViewModel _viewModel;
+   private readonly MainWindowViewModel _viewModel;
      private double _lastPreviewColumnWidth = 0;
-      private System.Timers.Timer? _columnResizeTimer;
+    private System.Timers.Timer? _columnResizeTimer;
 
-        public MainWindow()
+  public MainWindow()
         {
        InitializeComponent();
-       
+
             // Create and set ViewModel
-            _viewModel = new MainWindowViewModel();
-            DataContext = _viewModel;
+  _viewModel = new MainWindowViewModel();
+   DataContext = _viewModel;
 
     SetupUIMonitoring();
-        }
+   }
 
  private void SetupUIMonitoring()
  {
-        PreviewColumn.Width = 150;
-            _lastPreviewColumnWidth = 150;
+        // Initialize preview column to minimum decode width
+        PreviewColumn.Width = Preview.MinDecodeWidth;
+    _lastPreviewColumnWidth = Preview.MinDecodeWidth;
 
-  _columnResizeTimer = new System.Timers.Timer(300) { AutoReset = false };
+     // Dispose existing timer if present to prevent memory leaks
+     _columnResizeTimer?.Stop();
+  _columnResizeTimer?.Dispose();
+
+        // Create debounced timer for column resize events
+  _columnResizeTimer = new System.Timers.Timer(Preview.ColumnResizeDebounceMs) { AutoReset = false };
     _columnResizeTimer.Elapsed += ColumnResizeTimer_Elapsed;
 
-            var columnWidthMonitor = new System.Windows.Threading.DispatcherTimer
-        {
-Interval = TimeSpan.FromMilliseconds(100)
-            };
+      // Monitor column width changes at regular intervals
+      var columnWidthMonitor = new System.Windows.Threading.DispatcherTimer
+  {
+              Interval = TimeSpan.FromMilliseconds(Preview.ColumnWidthMonitorIntervalMs)
+  };
         columnWidthMonitor.Tick += (s, e) => CheckColumnWidthChanged();
-       columnWidthMonitor.Start();
+   columnWidthMonitor.Start();
         }
 
-        private void CheckColumnWidthChanged()
+  private void CheckColumnWidthChanged()
         {
-            if (PreviewColumn.ActualWidth > 0 && Math.Abs(PreviewColumn.ActualWidth - _lastPreviewColumnWidth) > 10)
+            // Trigger reload if column width changed by more than threshold
+      if (PreviewColumn.ActualWidth > 0 && 
+                Math.Abs(PreviewColumn.ActualWidth - _lastPreviewColumnWidth) > Preview.ColumnWidthChangeThreshold)
             {
   _columnResizeTimer?.Stop();
-            _columnResizeTimer?.Start();
+     _columnResizeTimer?.Start();
      }
   }
 
@@ -81,10 +92,10 @@ Interval = TimeSpan.FromMilliseconds(100)
         
    var tasks = itemsWithPreviews.Select(async item =>
 {
-        await semaphore.WaitAsync();
+        await semaphore.WaitAsync().ConfigureAwait(false);
    try
             {
-       var newPreview = await previewLoader.LoadPreviewImageFromColumnWidthAsync(item.Url, PreviewColumn.ActualWidth);
+       var newPreview = await previewLoader.LoadPreviewImageFromColumnWidthAsync(item.Url, PreviewColumn.ActualWidth).ConfigureAwait(false);
           if (newPreview != null)
       await Dispatcher.InvokeAsync(() => item.PreviewImage = newPreview);
        }
@@ -95,10 +106,10 @@ Interval = TimeSpan.FromMilliseconds(100)
       finally
        {
     semaphore.Release();
-        }
+   }
   });
 
-          await Task.WhenAll(tasks);
+      await Task.WhenAll(tasks).ConfigureAwait(false);
       }
 
         // Event handler for ListView selection changes

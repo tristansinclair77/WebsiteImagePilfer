@@ -1,142 +1,810 @@
-﻿# Task #14: Architecture Overhaul to MVVM
+﻿# WEBSITEIMAGEPILFER - CODE IMPROVEMENT PLAN
+## Comprehensive Step-by-Step Implementation Guide
 
-## ✅ STATUS: COMPLETED
-
-**Implementation Date:** 2024-12-19  
-**Build Status:** ✅ Successful  
-**All Acceptance Criteria:** ✅ Met (13/13)  
-**Documentation:** ✅ Complete
+Generated: [Date]
+Target Framework: .NET 8
+Priority: 🔴 High | 🟡 Medium | 🟢 Low
 
 ---
 
-## Overview
-This task involved a complete architectural refactoring to implement the Model-View-ViewModel (MVVM) pattern. The MainWindow.xaml.cs has been reduced from ~800 lines to ~130 lines (84% reduction), with all business logic moved to a comprehensive ViewModel.
+## PHASE 1: CRITICAL FIXES (Do First - High Risk Issues)
+
+### 🔴 STEP 1: Fix Memory Leak in MainWindowViewModel
+**File:** ViewModels\MainWindowViewModel.cs
+**Issue:** Event handlers attached to ImageDownloadItem but never detached
+**Location:** Constructor line ~308 and ImageItems.CollectionChanged handler
+
+**Actions:**
+1. Add event unsubscription when items are removed from collection
+2. Handle CollectionChanged Remove and Replace actions
+3. Subscribe to new items, unsubscribe from old items
+
+**Code Changes:**
+```csharp
+// In constructor, modify ImageItems.CollectionChanged handler:
+ImageItems.CollectionChanged += (s, e) =>
+{
+    InvalidateReadyItemsCache();
+    
+    // Unsubscribe from removed items
+    if (e.OldItems != null)
+  foreach (ImageDownloadItem item in e.OldItems)
+            item.PropertyChanged -= ImageItem_PropertyChanged;
+    
+    // Subscribe to new items
+    if (e.NewItems != null)
+     foreach (ImageDownloadItem item in e.NewItems)
+            item.PropertyChanged += ImageItem_PropertyChanged;
+  
+    if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add ||
+        e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+        ApplyStatusFilter();
+};
+```
+
+**Testing:** 
+- Scan multiple times and verify memory doesn't grow
+- Use memory profiler to confirm event handlers are released
 
 ---
 
-## What Was Completed
+### 🔴 STEP 2: Fix Timer Disposal Issue in MainWindow
+**File:** MainWindow.xaml.cs
+**Issue:** Timer can be recreated without disposing previous instance
+**Location:** SetupUIMonitoring() method
 
-### ✅ Files Created (4 new files)
-1. **ViewModels/ViewModelBase.cs** (44 lines) - Base class with INotifyPropertyChanged
-2. **Commands/RelayCommand.cs** (62 lines) - Synchronous command implementation
-3. **Commands/AsyncRelayCommand.cs** (92 lines) - Asynchronous command implementation
-4. **ViewModels/MainWindowViewModel.cs** (835 lines) - Complete business logic
+**Actions:**
+1. Dispose existing timer before creating new one
+2. Make timer nullable and check before disposal
+3. Ensure proper disposal in OnClosing
 
-### ✅ Files Modified (3 files)
-1. **MainWindow.xaml.cs** - Reduced from ~800 to 130 lines (thin view)
-2. **MainWindow.xaml** - Added comprehensive data bindings (17 commands, 28 properties)
-3. **Converters/ListViewIndexConverter.cs** - Updated to work with ViewModel
+**Code Changes:**
+```csharp
+private void SetupUIMonitoring()
+{
+    PreviewColumn.Width = 150;
+    _lastPreviewColumnWidth = 150;
 
-### ✅ Architecture Improvements
-- **Separation of Concerns:** View (UI) separated from ViewModel (Logic)
-- **Testability:** 95%+ of business logic now testable without UI
-- **Maintainability:** Clear organization with regions and patterns
-- **Reusability:** Command infrastructure reusable across application
-- **Data Binding:** 40+ bindings replace manual UI updates
+    // Dispose existing timer if present
+    _columnResizeTimer?.Stop();
+    _columnResizeTimer?.Dispose();
 
-### ✅ Implementation Details
-- **17 Commands** managing all user actions
-- **28 Properties** for data binding
-- **8 Status Filters** with automatic filtering
-- **Pagination Logic** fully in ViewModel
-- **State Management** centralized and testable
-- **Service Orchestration** clean and organized
+ _columnResizeTimer = new System.Timers.Timer(300) { AutoReset = false };
+    _columnResizeTimer.Elapsed += ColumnResizeTimer_Elapsed;
 
----
+  // Rest of method...
+}
+```
 
-## Documentation Created
-
-1. **TASK14_MVVM_COMPLETION_SUMMARY.md** - Comprehensive completion summary
-2. **MVVM_QUICK_REFERENCE.md** - Developer quick reference guide
-3. **MVVM_BEFORE_AFTER_COMPARISON.md** - Code transformation examples
+**Testing:**
+- Resize preview column multiple times
+- Check for timer disposal with debugger
 
 ---
 
-## Benefits Achieved
+### 🔴 STEP 3: Add Missing ConfigureAwait(false)
+**Files:** MainWindow.xaml.cs, MainWindowViewModel.cs, ImagePreviewLoader.cs
+**Issue:** Missing ConfigureAwait can cause deadlocks
 
-### Code Quality
-- ✅ **84% reduction** in MainWindow.xaml.cs size (800 → 130 lines)
-- ✅ **Zero event handlers** in code-behind for business logic
-- ✅ **Clean separation** of View and ViewModel
-- ✅ **Professional architecture** following WPF best practices
+**Actions:**
+1. Review ALL async methods that don't need UI context
+2. Add .ConfigureAwait(false) to non-UI operations
+3. Keep ConfigureAwait(true) or omit for UI operations
 
-### Testability
-- ✅ **95%+ testable** code (was 0%)
-- ✅ Unit tests can be written for all ViewModel logic
-- ✅ No UI dependencies in business logic
-- ✅ Mock-friendly design
+**Key Locations:**
+- MainWindow.xaml.cs: ReloadAllPreviewsAsync - line 41
+- MainWindowViewModel.cs: LoadAndSetPreviewAsync - line 675
+- All HttpClient calls
+- All File I/O operations
 
-### Maintainability
-- ✅ **Single responsibility** per class
-- ✅ **Clear organization** with regions
-- ✅ **Reusable infrastructure** (ViewModelBase, Commands)
-- ✅ **Easy to extend** with new features
+**Code Pattern:**
+```csharp
+// NON-UI operations (background work):
+var result = await SomeOperationAsync().ConfigureAwait(false);
 
-### Developer Experience
-- ✅ **IntelliSense** for properties and commands
-- ✅ **Clear patterns** to follow
-- ✅ **Comprehensive documentation** provided
-- ✅ **Future-ready** for dependency injection
+// UI operations (must return to UI thread):
+await Dispatcher.InvokeAsync(() => /* UI work */).ConfigureAwait(true); // or omit
+```
 
----
-
-## Acceptance Criteria: All Met ✅
-
-| Criterion | Status |
-|-----------|--------|
-| ✅ ViewModelBase created with INotifyPropertyChanged | COMPLETE |
-| ✅ RelayCommand and AsyncRelayCommand created | COMPLETE |
-| ✅ MainWindowViewModel created with all business logic | COMPLETE |
-| ✅ MainWindow.xaml.cs reduced to < 200 lines | COMPLETE (130) |
-| ✅ All button Click events replaced with Commands | COMPLETE (17) |
-| ✅ All properties use data binding | COMPLETE (28) |
-| ✅ No business logic in code-behind | COMPLETE |
-| ✅ ViewModel manages all application state | COMPLETE |
-| ✅ Commands manage all user actions | COMPLETE |
-| ✅ Build succeeds with no errors | COMPLETE |
-| ✅ Application runs without regression | COMPLETE |
-| ✅ All functionality preserved | COMPLETE |
-| ✅ MVVM pattern properly implemented | COMPLETE |
-
-**Result: 13/13 Criteria Met** ✅
+**Testing:**
+- Run under debugger and check for deadlocks
+- Test with rapid UI interactions during async operations
 
 ---
 
-## Future Enhancements Enabled
+### 🔴 STEP 4: Fix Cancellation Token Propagation
+**File:** ViewModels\MainWindowViewModel.cs
+**Issue:** DownloadSingleAsync uses CancellationToken.None
+**Location:** Line ~577
 
-This MVVM foundation makes the following easy to implement:
+**Actions:**
+1. Add CancellationToken parameter to DownloadSingleAsync
+2. Create and pass proper token from command execution
+3. Handle cancellation properly in UI
 
-### Immediate Opportunities
-1. **Unit Testing** - Write comprehensive tests for ViewModels
-2. **Dialog Service** - Replace MessageBox with testable service
-3. **Settings ViewModel** - Apply MVVM to SettingsWindow
-4. **Multiple Views** - Reuse ViewModel with different UI layouts
+**Code Changes:**
+```csharp
+// Add optional cancellation token parameter
+private async Task DownloadSingleAsync(object? parameter, CancellationToken cancellationToken = default)
+{
+ if (parameter is not ImageDownloadItem item)
+        return;
 
-### Long-term Possibilities
-1. **Dependency Injection** - Use Microsoft.Extensions.DependencyInjection
-2. **Navigation Service** - Multi-window navigation
-3. **Design-Time Data** - Better Visual Studio designer experience
-4. **Advanced Commands** - Progress reporting, conditional execution
-5. **Event Aggregator** - Loosely-coupled ViewModel communication
+    // ... validation code ...
+
+    try
+    {
+   await _imageDownloader.DownloadSingleItemAsync(item, cancellationToken);
+        // ... rest of method
+ }
+    catch (OperationCanceledException)
+    {
+        item.Status = Status.Cancelled;
+        StatusText = $"Cancelled download: {item.FileName}";
+    }
+}
+```
+
+**Testing:**
+- Test individual download cancellation
+- Verify status updates correctly
 
 ---
 
-## Conclusion
+### 🔴 STEP 5: Decide on CommunityToolkit.Mvvm Package
+**File:** WebsiteImagePilfer.csproj
+**Issue:** Package included but not used - wasting 2MB+ space
 
-Task #14 is **COMPLETE** and **SUCCESSFUL**. The application now follows industry-standard MVVM architecture with:
+**Option A - Remove Package (Recommended - Keep Custom Implementation):**
+1. Remove package reference from .csproj
+2. Keep existing ViewModelBase, RelayCommand, AsyncRelayCommand
+3. Document why custom implementation is used
 
-✅ **Professional Design** - Separation of concerns  
-✅ **Testable Code** - 95%+ business logic  
-✅ **Maintainable Structure** - Clear organization  
-✅ **Scalable Foundation** - Easy to extend  
-✅ **Best Practices** - WPF standards followed  
+**Option B - Migrate to CommunityToolkit (More Features, Better Maintained):**
+1. Replace ViewModelBase with ObservableObject
+2. Replace RelayCommand with CommunityToolkit version
+3. Replace AsyncRelayCommand with AsyncRelayCommand from toolkit
+4. Use [ObservableProperty] and [RelayCommand] attributes
+5. Update all ViewModels and Models
 
-This was the most significant refactoring in the project, successfully executed without any loss of functionality.
+**Recommendation:** Option A for now (less work, custom code already good)
+
+**Actions for Option A:**
+```xml
+<!-- Remove from WebsiteImagePilfer.csproj -->
+<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+```
+
+**Testing:**
+- Build project and verify no errors
+- Test all commands and property binding
 
 ---
 
-**Estimated Time:** 8 hours  
-**Priority:** HIGHEST ✅  
-**Status:** ✅ COMPLETE  
-**Quality:** ✅ Excellent  
-**Ready for Production:** ✅ Yes
+## PHASE 2: PERFORMANCE OPTIMIZATIONS (Improve Speed & Efficiency)
+
+### 🟡 STEP 6: Make Settings File Operations Async
+**File:** PortableSettingsManager.cs
+**Issue:** Synchronous file I/O blocks UI thread
+
+**Actions:**
+1. Convert LoadSettings() to LoadSettingsAsync()
+2. Convert SaveSettings() to SaveSettingsAsync()
+3. Update all callers to use async versions
+4. Add ConfigureAwait(false) to file operations
+
+**Code Changes:**
+```csharp
+public static async Task<AppSettings> LoadSettingsAsync()
+{
+    try
+    {
+     if (!File.Exists(SettingsFilePath))
+    {
+  Logger.Info($"Settings file not found at {SettingsFilePath}, returning defaults");
+       return new AppSettings();
+  }
+
+  string json = await File.ReadAllTextAsync(SettingsFilePath).ConfigureAwait(false);
+      var settings = JsonSerializer.Deserialize<AppSettings>(json);
+        
+      // ... rest of method
+    }
+ // ... exception handling
+}
+
+public static async Task<bool> SaveSettingsAsync(AppSettings settings)
+{
+    // ... validation code ...
+    
+    try
+    {
+    var options = new JsonSerializerOptions { WriteIndented = true };
+        string json = JsonSerializer.Serialize(settings, options);
+        await File.WriteAllTextAsync(SettingsFilePath, json).ConfigureAwait(false);
+    Logger.Info($"Settings saved successfully to {SettingsFilePath}");
+        return true;
+    }
+    // ... exception handling
+}
+```
+
+**Update Callers:**
+- DownloadSettings.LoadFromPortableSettings() -> async
+- DownloadSettings.SaveToPortableSettings() -> async
+- MainWindowViewModel constructor - await LoadSettingsAsync()
+
+**Testing:**
+- Verify settings load/save still works
+- Check UI doesn't freeze during save
+
+---
+
+### 🟡 STEP 7: Optimize UpdateDownloadSelectedButtonState
+**File:** ViewModels\MainWindowViewModel.cs
+**Issue:** Inefficient LINQ called frequently
+**Location:** Line ~719
+
+**Actions:**
+1. Cache ready count in SelectedItems tracking
+2. Update count when selection changes
+3. Avoid recalculating every time
+
+**Code Changes:**
+```csharp
+private int _selectedReadyCount = 0;
+
+// Update SelectedItems.CollectionChanged in constructor:
+SelectedItems.CollectionChanged += (s, e) => 
+{
+    RecalculateSelectedReadyCount();
+    UpdateDownloadSelectedButtonState();
+};
+
+private void RecalculateSelectedReadyCount()
+{
+    _selectedReadyCount = SelectedItems.Count(item => item.Status == Status.Ready);
+}
+
+private void UpdateDownloadSelectedButtonState()
+{
+    IsDownloadSelectedEnabled = _selectedReadyCount > 0 && !IsCancelEnabled;
+}
+
+// Also update when item status changes:
+private void ImageItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+{
+    if (e.PropertyName == nameof(ImageDownloadItem.Status))
+    {
+      ApplyStatusFilter();
+        RecalculateSelectedReadyCount(); // Add this
+    }
+}
+```
+
+**Testing:**
+- Select multiple items and verify button state
+- Download items and verify button disables
+
+---
+
+### 🟡 STEP 8: Optimize Regex Pattern in ImageScanner
+**File:** Services\ImageScanner.cs
+**Issue:** Regex pattern built every time ExtractFromRegex is called
+**Location:** ExtractFromRegex method
+
+**Actions:**
+1. Create static compiled Regex
+2. Cache pattern at class level
+3. Use compiled regex option for performance
+
+**Code Changes:**
+```csharp
+// Add at class level:
+private static readonly Lazy<Regex> _imageUrlRegex = new Lazy<Regex>(() =>
+{
+    var extensions = string.Join("|", Images.Extensions.Select(e => e.TrimStart('.')));
+    var pattern = $@"https?://[^\s""'<>\\]+?\.(?:{extensions})(?:\?[^\s""'<>\\]*)?";
+    return new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
+});
+
+// Update ExtractFromRegex method:
+private void ExtractFromRegex(string renderedHtml, HashSet<string> imageUrls, CancellationToken cancellationToken)
+{
+    var matches = _imageUrlRegex.Value.Matches(renderedHtml);
+ 
+    foreach (Match match in matches)
+    {
+        if (cancellationToken.IsCancellationRequested) break;
+ if (Uri.TryCreate(match.Value, UriKind.Absolute, out Uri? uri))
+       imageUrls.Add(uri.ToString());
+    }
+}
+```
+
+**Testing:**
+- Scan pages and verify images still found
+- Measure performance improvement with stopwatch
+
+---
+
+### 🟡 STEP 9: Set Reasonable HttpClient Timeout
+**File:** Services\HttpClientFactory.cs
+**Issue:** Infinite timeout can cause hanging operations
+**Location:** CreateHttpClient method
+
+**Actions:**
+1. Set default timeout to 30 seconds
+2. Use per-operation timeouts where needed
+3. Document timeout strategy
+
+**Code Changes:**
+```csharp
+private static HttpClient CreateHttpClient()
+{
+    var handler = new SocketsHttpHandler
+    {
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+      MaxConnectionsPerServer = 10,
+        AutomaticDecompression = System.Net.DecompressionMethods.All
+    };
+
+    var client = new HttpClient(handler)
+    {
+        // Set reasonable default timeout (30 seconds)
+        // Individual operations can override with CancellationTokenSource
+        Timeout = TimeSpan.FromSeconds(Network.HttpTimeoutSeconds)
+    };
+
+    client.DefaultRequestHeaders.Add("User-Agent", "WebsiteImagePilfer/1.0 (Mozilla/5.0 compatible)");
+    client.DefaultRequestHeaders.Add("Accept", "image/*, text/html, application/xhtml+xml, */*");
+
+    return client;
+}
+```
+
+**Testing:**
+- Test with slow network connections
+- Verify timeout works as expected
+
+---
+
+### 🟡 STEP 10: Replace Magic Numbers with Constants
+**File:** MainWindow.xaml.cs
+**Issue:** Hardcoded numbers instead of using AppConstants
+**Locations:** Lines with 10, 150, 300, etc.
+
+**Actions:**
+1. Use AppConstants.Preview.ColumnWidthChangeThreshold instead of 10
+2. Use AppConstants.Preview.MinDecodeWidth instead of 150
+3. Use AppConstants.Preview.ColumnResizeDebounceMs instead of 300
+4. Add any missing constants to AppConstants
+
+**Code Changes:**
+```csharp
+// Line ~23: Use constant
+if (Math.Abs(PreviewColumn.ActualWidth - _lastPreviewColumnWidth) > 
+    AppConstants.Preview.ColumnWidthChangeThreshold)
+
+// Line ~27: Use constant  
+_columnResizeTimer = new System.Timers.Timer(AppConstants.Preview.ColumnResizeDebounceMs) 
+    { AutoReset = false };
+
+// Line ~53, 64: Use constant
+var newPreview = await previewLoader.LoadPreviewImageFromColumnWidthAsync(
+    item.Url, PreviewColumn.ActualWidth);
+```
+
+**Testing:**
+- Verify column resizing still works
+- Check preview loading behavior
+
+---
+
+## PHASE 3: CODE QUALITY IMPROVEMENTS (Maintainability)
+
+### 🟢 STEP 11: Improve Exception Handling
+**Files:** Logger.cs, ImageScanner.cs, ImagePreviewCache.cs, etc.
+**Issue:** Many empty catch blocks swallow exceptions silently
+
+**Actions:**
+1. Add minimum logging to all empty catch blocks
+2. Use Logger.Error or Logger.Warning
+3. Consider if exception should be rethrown
+4. Document why exception is being swallowed
+
+**Code Pattern:**
+```csharp
+// BEFORE (Bad):
+try { /* operation */ }
+catch { /* Silent failure */ }
+
+// AFTER (Good):
+try { /* operation */ }
+catch (Exception ex)
+{
+    Logger.Warning("Operation failed but continuing", ex);
+    // Or Logger.Error if it's more serious
+}
+```
+
+**Key Locations:**
+- ImageScanner.cs: Multiple catch blocks in ScrollPage, ExtractCurrentImages
+- ImagePreviewCache.cs: SaveToDiskAsync catch block
+- Logger.cs: WriteToFileAsync catch block
+- MainWindowViewModel.cs: LoadAndSetPreviewAsync catch block
+
+**Testing:**
+- Trigger exceptions and verify they're logged
+- Check log files contain useful information
+
+---
+
+### 🟢 STEP 12: Standardize String Null Checking
+**Files:** All files (multiple locations)
+**Issue:** Inconsistent use of string.IsNullOrEmpty vs != null
+
+**Actions:**
+1. Use string.IsNullOrEmpty for simple null/empty checks
+2. Use string.IsNullOrWhiteSpace when whitespace matters
+3. Update all inconsistent usages
+
+**Decision Matrix:**
+- Checking if string has content: `string.IsNullOrWhiteSpace(str)`
+- Checking if string is null or "": `string.IsNullOrEmpty(str)`
+- Checking only for null: `str is null` or `str == null`
+
+**Key Locations:**
+- FileNameExtractor.cs: Multiple checks
+- ImageDownloader.cs: URL validation
+- MainWindowViewModel.cs: Multiple string checks
+
+**Testing:**
+- Ensure no behavior changes
+- Test with null, empty, and whitespace strings
+
+---
+
+### 🟢 STEP 13: Add Settings Property Validation
+**File:** Models\DownloadSettings.cs
+**Issue:** Settings can be invalid during runtime
+
+**Actions:**
+1. Add validation to property setters
+2. Clamp values to valid ranges
+3. Raise PropertyChanged events
+4. Log validation warnings
+
+**Code Changes:**
+```csharp
+public class DownloadSettings : INotifyPropertyChanged
+{
+    private int _minimumImageSize = 5000;
+private int _maxImagesToScan = 20;
+    private int _itemsPerPage = 50;
+
+    public int MinimumImageSize 
+    { 
+        get => _minimumImageSize;
+        set
+   {
+            var clamped = Math.Clamp(value, 
+    AppConstants.Validation.MinImageSize, 
+             AppConstants.Validation.MaxImageSize);
+         
+            if (clamped != value)
+          Logger.Warning($"MinimumImageSize clamped from {value} to {clamped}");
+   
+            SetProperty(ref _minimumImageSize, clamped);
+        }
+    }
+
+    // Similar for other validated properties...
+
+ public event PropertyChangedEventHandler? PropertyChanged;
+    
+    protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    {
+if (EqualityComparer<T>.Default.Equals(field, value))
+    return false;
+
+        field = value;
+   PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        return true;
+  }
+}
+```
+
+**Testing:**
+- Set invalid values in settings UI
+- Verify clamping works correctly
+
+---
+
+### 🟢 STEP 14: Improve Fallback Filename Generation
+**File:** Helpers\FileNameExtractor.cs
+**Issue:** DateTime.Now could cause collisions in rapid succession
+**Location:** GenerateFallbackFileName method
+
+**Actions:**
+1. Add milliseconds to timestamp
+2. Use Guid for uniqueness
+3. Consider using both
+
+**Code Changes:**
+```csharp
+private static string GenerateFallbackFileName()
+{
+    // Use timestamp with milliseconds + short GUID for guaranteed uniqueness
+    var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+    var guidPart = Guid.NewGuid().ToString("N")[..Files.GuidShortLength];
+    return $"image_{timestamp}_{guidPart}{Files.FallbackExtension}";
+}
+```
+
+**Testing:**
+- Generate multiple filenames in loop
+- Verify no duplicates
+
+---
+
+### 🟢 STEP 15: Consolidate State Management
+**File:** ViewModels\MainWindowViewModel.cs
+**Issue:** Duplicate code in Set*State methods
+**Location:** State Management region
+
+**Actions:**
+1. Create unified state enum
+2. Create single SetUIState(UIState state) method
+3. Reduce code duplication
+
+**Code Changes:**
+```csharp
+public enum UIState
+{
+    Ready,
+    Scanning,
+    ScanComplete,
+    Downloading,
+    DownloadComplete,
+ Cancelled,
+    Cancelling
+}
+
+private void SetUIState(UIState state, int imageCount = 0, bool hasImages = false)
+{
+    switch (state)
+    {
+        case UIState.Ready:
+ IsScanEnabled = true;
+   IsDownloadEnabled = imageCount > 0 || hasImages;
+            IsCancelEnabled = false;
+    ProgressValue = 0;
+          UpdateDownloadSelectedButtonState();
+            break;
+            
+    case UIState.Scanning:
+            IsScanEnabled = false;
+  IsDownloadEnabled = false;
+      IsDownloadSelectedEnabled = false;
+  IsCancelEnabled = true;
+            StatusText = "Scanning webpage...";
+            break;
+            
+    // ... other states
+    }
+}
+
+// Replace old methods with:
+private void SetReadyState() => SetUIState(UIState.Ready, ImageItems.Count);
+private void SetScanningState() => SetUIState(UIState.Scanning);
+// etc.
+```
+
+**Testing:**
+- Test all state transitions
+- Verify button states correct in each state
+
+---
+
+## PHASE 4: ARCHITECTURAL IMPROVEMENTS (Long-term)
+
+### 🟢 STEP 16: Implement Dialog Service (Future)
+**File:** ViewModels\MainWindowViewModel.cs
+**Issue:** Direct MessageBox.Show calls - not testable
+**TODO Comment:** Line ~710
+
+**Actions (Future Implementation):**
+1. Create IDialogService interface
+2. Implement WpfDialogService
+3. Inject into ViewModel
+4. Replace all MessageBox.Show calls
+5. Create mock dialog service for testing
+
+**Interface Design:**
+```csharp
+public interface IDialogService
+{
+    void ShowInfo(string message, string title = "Info");
+    void ShowWarning(string message, string title = "Warning");
+  void ShowError(string message, string title = "Error");
+    bool ShowConfirmation(string message, string title = "Confirm");
+    string? ShowInputDialog(string message, string defaultValue = "");
+}
+```
+
+**Note:** This is a future enhancement - not critical for current functionality
+
+---
+
+### 🟢 STEP 17: Add Dependency Injection (Future)
+**Multiple Files**
+**Issue:** Manual service creation and dependencies
+
+**Actions (Future Implementation):**
+1. Add Microsoft.Extensions.DependencyInjection package
+2. Create ServiceCollection in App.xaml.cs
+3. Register all services and ViewModels
+4. Use constructor injection
+5. Remove HttpClientFactory singleton pattern
+
+**Note:** Major refactoring - save for version 2.0
+
+---
+
+### 🟢 STEP 18: Add Unit Tests (Future)
+**New Project Required**
+**Issue:** No test coverage
+
+**Actions (Future Implementation):**
+1. Create WebsiteImagePilfer.Tests project
+2. Add xUnit or NUnit
+3. Test business logic in services
+4. Test ViewModels with mocks
+5. Aim for 70%+ code coverage
+
+**Priority Test Areas:**
+- FileNameExtractor.ExtractFromUrl
+- LruCache operations
+- Settings validation
+- ImageScanner URL extraction logic
+
+---
+
+### 🟢 STEP 19: Add Configurable Logging Levels
+**File:** Services\Logger.cs
+**Issue:** Always logs at all levels
+
+**Actions (Future Implementation):**
+1. Add LogLevel configuration to settings
+2. Check log level before writing
+3. Add configuration in settings UI
+4. Default to Info level in production
+
+---
+
+### 🟢 STEP 20: Externalize UI Strings (Future)
+**Multiple Files**
+**Issue:** Hardcoded strings prevent localization
+
+**Actions (Future Implementation):**
+1. Create Resources.resx file
+2. Move all user-facing strings to resources
+3. Use Resources.StringName instead of "literal"
+4. Prepare for future localization
+
+**Note:** Only needed if internationalization is planned
+
+---
+
+## IMPLEMENTATION ORDER & TIMELINE
+
+### Week 1: Critical Fixes (Must Do)
+- [ ] Step 1: Fix memory leak (2 hours)
+- [ ] Step 2: Fix timer disposal (1 hour)
+- [ ] Step 3: Add ConfigureAwait (3 hours)
+- [ ] Step 4: Fix cancellation token (1 hour)
+- [ ] Step 5: Remove CommunityToolkit package (30 minutes)
+
+**Total: ~7.5 hours**
+
+### Week 2: Performance Optimizations (Should Do)
+- [ ] Step 6: Async file operations (2 hours)
+- [ ] Step 7: Optimize button state updates (1 hour)
+- [ ] Step 8: Optimize regex (1 hour)
+- [ ] Step 9: HttpClient timeout (30 minutes)
+- [ ] Step 10: Replace magic numbers (1 hour)
+
+**Total: ~5.5 hours**
+
+### Week 3: Code Quality (Nice to Have)
+- [ ] Step 11: Improve exception handling (3 hours)
+- [ ] Step 12: Standardize string checks (2 hours)
+- [ ] Step 13: Settings validation (2 hours)
+- [ ] Step 14: Improve filename generation (30 minutes)
+- [ ] Step 15: Consolidate state management (2 hours)
+
+**Total: ~9.5 hours**
+
+### Week 4+: Architectural (Future Enhancements)
+- [ ] Steps 16-20: As time permits
+
+---
+
+## TESTING CHECKLIST
+
+After each phase, verify:
+- [ ] Project builds without errors
+- [ ] All unit tests pass (when added)
+- [ ] No new compiler warnings
+- [ ] Application starts successfully
+- [ ] Can scan a webpage
+- [ ] Can download images
+- [ ] Settings persist correctly
+- [ ] Cancellation works
+- [ ] Preview images load
+- [ ] Pagination works
+- [ ] No memory leaks (use profiler)
+- [ ] No UI freezing
+- [ ] Error messages display correctly
+
+---
+
+## ROLLBACK PLAN
+
+Before starting:
+1. Commit all current changes to Git
+2. Create branch: `feature/code-improvements`
+3. Make changes incrementally
+4. Commit after each successful step
+5. If issues arise, can revert individual commits
+
+---
+
+## PERFORMANCE METRICS TO TRACK
+
+Before and after measurements:
+- [ ] Application startup time
+- [ ] Memory usage after 10 scans
+- [ ] Scan time for test page
+- [ ] Download time for 100 images
+- [ ] UI responsiveness during operations
+- [ ] Binary size
+
+---
+
+## NOTES & DECISIONS
+
+### Why Not Use CommunityToolkit.Mvvm?
+- Current custom implementation is clean and sufficient
+- No need for additional features
+- Reduces package dependencies
+- Saves ~2MB in binary size
+
+### Why Async File I/O?
+- Prevents UI freezing on slow disks
+- Better user experience
+- Modern best practice for .NET 8
+
+### Why Fix Memory Leaks First?
+- Can cause application crashes over time
+- Hard to debug after release
+- Critical for long-running sessions
+
+---
+
+## COMPLETION CRITERIA
+
+Project improvements are complete when:
+✅ All Phase 1 (Critical) steps completed and tested
+✅ All Phase 2 (Performance) steps completed and tested
+✅ At least 50% of Phase 3 (Quality) completed
+✅ No new bugs introduced
+✅ Application performance improved or unchanged
+✅ Memory usage stable over time
+✅ Code coverage documented
+✅ All changes committed to Git with clear messages
+
+---
+
+END OF IMPROVEMENT PLAN
