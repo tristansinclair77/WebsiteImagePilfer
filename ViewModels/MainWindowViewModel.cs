@@ -276,6 +276,7 @@ namespace WebsiteImagePilfer.ViewModels
         public ICommand NextPageCommand { get; }
         public ICommand ItemDoubleClickCommand { get; }
         public ICommand DownloadSingleCommand { get; }
+        public ICommand ForceDownloadSingleCommand { get; }
         public ICommand ReloadPreviewCommand { get; }
         public ICommand CancelSingleCommand { get; }
         public ICommand IgnoreCommand { get; }
@@ -329,6 +330,7 @@ namespace WebsiteImagePilfer.ViewModels
             NextPageCommand = new RelayCommand(_ => NextPage());
             ItemDoubleClickCommand = new AsyncRelayCommand(async item => await OnItemDoubleClick(item));
             DownloadSingleCommand = new AsyncRelayCommand(async item => await DownloadSingleAsync(item));
+            ForceDownloadSingleCommand = new AsyncRelayCommand(async item => await ForceDownloadSingleAsync(item));
             ReloadPreviewCommand = new AsyncRelayCommand(async item => await ReloadPreviewAsync(item));
             CancelSingleCommand = new RelayCommand(item => CancelSingle(item));
             IgnoreCommand = new RelayCommand(item => IgnoreItem(item));
@@ -682,6 +684,36 @@ namespace WebsiteImagePilfer.ViewModels
             }
         }
 
+        private async Task ForceDownloadSingleAsync(object? parameter)
+        {
+            if (parameter is not ImageDownloadItem item)
+                return;
+
+            var originalStatus = item.Status;
+            item.Status = Status.Downloading;
+
+            try
+            {
+                // Use global cancellation token if available, otherwise use default
+                var cancellationToken = _cancellationTokenSource?.Token ?? default;
+                await _imageDownloader.DownloadSingleItemAsync(item, cancellationToken, forceDownload: true);
+                if (item.Status == Status.Done || item.Status == Status.Backup)
+                    StatusText = $"Force downloaded: {item.FileName}";
+            }
+            catch (OperationCanceledException)
+            {
+                item.Status = Status.Cancelled;
+                item.ErrorMessage = "Cancelled by user";
+                StatusText = $"Cancelled download: {item.FileName}";
+            }
+            catch (Exception ex)
+            {
+                item.Status = Status.Failed;
+                item.ErrorMessage = ex.Message;
+                ShowError($"Failed to download: {ex.Message}", "Download Error");
+            }
+        }
+
         private async Task ReloadPreviewAsync(object? parameter)
         {
             if (parameter is not ImageDownloadItem item)
@@ -740,13 +772,6 @@ namespace WebsiteImagePilfer.ViewModels
             if (parameter is not ImageDownloadItem item)
                 return;
 
-            if (item.Status == Status.Ignored)
-            {
-                ShowInfo("Item is already ignored.", "Already Ignored");
-                return;
-            }
-
-            // Store the current status before ignoring
             item.PreviousStatus = item.Status;
             item.Status = Status.Ignored;
             StatusText = $"Ignored: {item.FileName}";
@@ -757,16 +782,12 @@ namespace WebsiteImagePilfer.ViewModels
             if (parameter is not ImageDownloadItem item)
                 return;
 
-            if (item.Status != Status.Ignored)
+            if (item.Status == Status.Ignored)
             {
-                ShowInfo("Item is not currently ignored.", "Not Ignored");
-                return;
+                item.Status = item.PreviousStatus ?? Status.Ready;
+                item.PreviousStatus = null;
+                StatusText = $"Unignored: {item.FileName}";
             }
-
-            // Restore the previous status, or default to Ready if none was stored
-            item.Status = item.PreviousStatus ?? Status.Ready;
-            item.PreviousStatus = null;
-            StatusText = $"Unignored: {item.FileName}";
         }
 
         #endregion

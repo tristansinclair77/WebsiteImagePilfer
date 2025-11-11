@@ -150,7 +150,7 @@ namespace WebsiteImagePilfer
         {
             if (ImageList.SelectedItem is ImageDownloadItem item)
             {
-                _viewModel.DownloadSingleCommand.Execute(item);
+                _viewModel.ForceDownloadSingleCommand.Execute(item);
             }
         }
 
