@@ -12,6 +12,7 @@ namespace WebsiteImagePilfer.Models
         private string? _thumbnailPath;
         private string _errorMessage = "";
         private BitmapImage? _previewImage;
+        private string? _previousStatus;
 
         public string Url
         {
@@ -23,6 +24,12 @@ namespace WebsiteImagePilfer.Models
         {
             get => _status;
             set => SetProperty(ref _status, value);
+        }
+
+        public string? PreviousStatus
+        {
+            get => _previousStatus;
+            set => SetProperty(ref _previousStatus, value);
         }
 
         public string FileName

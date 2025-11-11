@@ -186,6 +186,10 @@ IsChecked="{Binding FilterSkipped}"/>
 Style="{StaticResource FilterCheckBox}"
       Content="Downloading..." 
      IsChecked="{Binding FilterDownloading}"/>
+          <CheckBox x:Name="FilterIgnoredCheckBox" 
+Style="{StaticResource FilterCheckBox}"
+      Content="Ignored" 
+     IsChecked="{Binding FilterIgnored}"/>
  <Separator Width="20" Opacity="0" Margin="0,3,0,3"/>
     <Button x:Name="SelectAllStatusButton" 
    Style="{StaticResource TinyButton}"
@@ -210,11 +214,14 @@ Grid.Row="4"
  SelectionChanged="ImageList_SelectionChanged"
      MouseDoubleClick="ImageList_MouseDoubleClick">
  <ListView.ContextMenu>
-      <ContextMenu>
-       <MenuItem Header="Download (Force)" Click="ContextMenu_Download_Click" />
-  <MenuItem Header="Reload Preview" Click="ContextMenu_ReloadPreview_Click" />
+      <ContextMenu Opened="ContextMenu_Opened">
+       <MenuItem x:Name="ContextMenu_Download" Header="Download (Force)" Click="ContextMenu_Download_Click" />
+  <MenuItem x:Name="ContextMenu_ReloadPreview" Header="Reload Preview" Click="ContextMenu_ReloadPreview_Click" />
       <Separator />
-        <MenuItem Header="Cancel Download" Click="ContextMenu_Cancel_Click" />
+        <MenuItem x:Name="ContextMenu_Ignore" Header="Ignore" Click="ContextMenu_Ignore_Click" />
+        <MenuItem x:Name="ContextMenu_Unignore" Header="Unignore" Click="ContextMenu_Unignore_Click" />
+      <Separator />
+        <MenuItem x:Name="ContextMenu_Cancel" Header="Cancel Download" Click="ContextMenu_Cancel_Click" />
        </ContextMenu>
   </ListView.ContextMenu>
       <ListView.View>
