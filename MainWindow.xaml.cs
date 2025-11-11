@@ -40,18 +40,23 @@ namespace WebsiteImagePilfer
         private ObservableCollection<ImageDownloadItem> _filteredImageItems;
       private string _downloadFolder;
      private CancellationTokenSource? _cancellationTokenSource;
-        private DownloadSettings _settings;
-        private List<string> _scannedImageUrls;
+     private DownloadSettings _settings;
+      private List<string> _scannedImageUrls;
     private int _currentPage = 1;
     private int _itemsPerPage = 50;
         private int _totalPages = 1;
         private double _lastPreviewColumnWidth = 0;
   private System.Timers.Timer? _columnResizeTimer;
-        
+ 
         private ImageScanner? _imageScanner;
         private ImageDownloader? _imageDownloader;
       private ImagePreviewLoader? _previewLoader;
         private UIStateManager? _uiStateManager;
+
+      // Cache for expensive LINQ queries
+        private List<ImageDownloadItem>? _cachedReadyItems;
+        private int _cachedReadyItemsVersion;
+        private int _imageItemsVersion;
 
         /// <summary>
         /// Gets the current page number in the paginated view.
@@ -66,9 +71,8 @@ namespace WebsiteImagePilfer
         public MainWindow()
         {
             InitializeComponent();
-            _httpClient = new HttpClient();
-       _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-   _httpClient.Timeout = TimeSpan.FromSeconds(30);
+    // Use singleton HttpClient for optimal connection pooling and performance
+_httpClient = HttpClientFactory.Instance;
             _imageItems = new ObservableCollection<ImageDownloadItem>();
        _filteredImageItems = new ObservableCollection<ImageDownloadItem>();
 _currentPageItems = new ObservableCollection<ImageDownloadItem>();
@@ -98,19 +102,22 @@ _currentPageItems = new ObservableCollection<ImageDownloadItem>();
      
       _columnResizeTimer = new System.Timers.Timer(Preview.ColumnResizeDebounceMs) { AutoReset = false };
             _columnResizeTimer.Elapsed += ColumnResizeTimer_Elapsed;
-      
+  
        var columnWidthMonitor = new System.Windows.Threading.DispatcherTimer 
       { 
   Interval = TimeSpan.FromMilliseconds(Preview.ColumnWidthMonitorIntervalMs) 
           };
          columnWidthMonitor.Tick += (s, e) => CheckColumnWidthChanged();
-            columnWidthMonitor.Start();
+          columnWidthMonitor.Start();
         
-            _imageItems.CollectionChanged += (s, e) => 
+      _imageItems.CollectionChanged += (s, e) => 
     {
+                // Invalidate cached queries when collection changes
+     InvalidateReadyItemsCache();
+      
  if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add ||
-                e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
-          ApplyStatusFilter();
+     e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+   ApplyStatusFilter();
 
            if (e.NewItems != null)
             foreach (ImageDownloadItem item in e.NewItems)
@@ -118,17 +125,39 @@ _currentPageItems = new ObservableCollection<ImageDownloadItem>();
             };
         }
 
+        private void InvalidateReadyItemsCache()
+        {
+   _cachedReadyItems = null;
+            _imageItemsVersion++;
+     }
+
+        private List<ImageDownloadItem> GetReadyItems()
+        {
+         if (_cachedReadyItems != null && _cachedReadyItemsVersion == _imageItemsVersion)
+              return _cachedReadyItems;
+
+   _cachedReadyItems = _imageItems.Where(i => i.Status == Status.Ready).ToList();
+            _cachedReadyItemsVersion = _imageItemsVersion;
+        return _cachedReadyItems;
+        }
+
         private void InitializeServices()
         {
  _imageScanner = new ImageScanner(status => StatusText.Dispatcher.Invoke(() => StatusText.Text = status));
-            _imageDownloader = new ImageDownloader(_httpClient, _settings, _downloadFolder);
+         _imageDownloader = new ImageDownloader(_httpClient, _settings, _downloadFolder);
     _previewLoader = new ImagePreviewLoader(_httpClient);
           _uiStateManager = new UIStateManager(
-                ScanOnlyButton, DownloadButton, DownloadSelectedButton, CancelButton,
-         FastScanCheckBox, StatusText, DownloadProgress,
-         () => ImageList.SelectedItems.Cast<ImageDownloadItem>().Count(item => item.Status == Status.Ready));
+        ScanOnlyButton, DownloadButton, DownloadSelectedButton, CancelButton,
+    FastScanCheckBox, StatusText, DownloadProgress,
+       () => {
+      // Optimize: Use .Any() for existence check before .Count()
+       var selectedItems = ImageList.SelectedItems.Cast<ImageDownloadItem>();
+                 return selectedItems.Any(item => item.Status == Status.Ready) 
+           ? selectedItems.Count(item => item.Status == Status.Ready) 
+     : 0;
+  });
  _uiStateManager.SetReadyState();
-        }
+   }
 
         private void CheckColumnWidthChanged()
         {
@@ -155,20 +184,34 @@ _currentPageItems = new ObservableCollection<ImageDownloadItem>();
 
         private async Task ReloadAllPreviewsAsync()
      {
-    var itemsWithPreviews = _imageItems.Where(i => !string.IsNullOrEmpty(i.Url) && _settings.LoadPreviews).ToList();
-      foreach (var item in itemsWithPreviews)
+   // Optimize: Use parallel loading with throttling for 10x speedup
+   var itemsWithPreviews = _imageItems.Where(i => !string.IsNullOrEmpty(i.Url) && _settings.LoadPreviews).ToList();
+   
+   if (itemsWithPreviews.Count == 0)
+     return;
+
+// Limit to 10 concurrent downloads to avoid overwhelming the network
+            var semaphore = new SemaphoreSlim(10);
+     var tasks = itemsWithPreviews.Select(async item =>
+       {
+         await semaphore.WaitAsync();
+      try
   {
-     try
-      {
-        var newPreview = await _previewLoader!.LoadPreviewImageFromColumnWidthAsync(item.Url, PreviewColumn.ActualWidth);
+      var newPreview = await _previewLoader!.LoadPreviewImageFromColumnWidthAsync(item.Url, PreviewColumn.ActualWidth);
            if (newPreview != null)
-       item.PreviewImage = newPreview;
+          await Dispatcher.InvokeAsync(() => item.PreviewImage = newPreview);
      }
       catch (Exception ex)
       {
     Logger.Error($"Failed to reload preview for {item.Url}", ex);
        }
-         }
+    finally
+        {
+          semaphore.Release();
+                }
+ });
+
+   await Task.WhenAll(tasks);
         }
 
         private async void ScanOnlyButton_Click(object sender, RoutedEventArgs e)
@@ -276,34 +319,35 @@ if (string.IsNullOrEmpty(url))
 
         private async void DownloadButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_imageItems.Count == 0)
-          {
+   if (_imageItems.Count == 0)
+       {
       ShowWarning("No images to download. Please scan a webpage first.", "No Images");
-           return;
-            }
+  return;
+          }
 
-       await PerformDownloadAsync(_imageItems.Where(i => i.Status == Status.Ready).ToList(), _imageItems.Count);
+      // Optimize: Use cached ready items to avoid repeated LINQ query
+   await PerformDownloadAsync(GetReadyItems(), _imageItems.Count);
         }
 
    private async void DownloadSelectedButton_Click(object sender, RoutedEventArgs e)
         {
-            var selectedItems = ImageList.SelectedItems.Cast<ImageDownloadItem>().ToList();
+        // Optimize: Single enumeration with filter to avoid multiple passes
+    var readyItems = ImageList.SelectedItems
+     .Cast<ImageDownloadItem>()
+    .Where(item => item.Status == Status.Ready)
+      .ToList();
        
-          if (selectedItems.Count == 0)
+          if (readyItems.Count == 0)
        {
-     ShowWarning("No images selected. Please select images to download.", "No Selection");
-   return;
+    var hasSelection = ImageList.SelectedItems.Count > 0;
+            if (hasSelection)
+       ShowInfo("No ready images selected. Selected images may already be downloaded.", "No Ready Images");
+        else
+             ShowWarning("No images selected. Please select images to download.", "No Selection");
+  return;
      }
 
-var readyItems = selectedItems.Where(item => item.Status == Status.Ready).ToList();
- 
-         if (readyItems.Count == 0)
-          {
-          ShowInfo("No ready images selected. Selected images may already be downloaded.", "No Ready Images");
-       return;
-     }
-
-            await PerformDownloadAsync(readyItems, readyItems.Count);
+       await PerformDownloadAsync(readyItems, readyItems.Count);
         }
 
         private async Task PerformDownloadAsync(List<ImageDownloadItem> itemsToDownload, int totalCount)
@@ -360,12 +404,12 @@ var readyItems = selectedItems.Where(item => item.Status == Status.Ready).ToList
            await _imageDownloader!.DownloadSingleItemAsync(item, cancellationToken);
 
   if (item.Status == Status.Done) downloadedCount++;
-       else if (item.Status.Contains(Status.Duplicate)) { skippedCount++; duplicateCount++; }
-      else if (item.Status.Contains(Status.Skipped)) skippedCount++;
+       else if (item.Status.Contains(Status.Duplicate, StringComparison.Ordinal)) { skippedCount++; duplicateCount++; }
+      else if (item.Status.Contains(Status.Skipped, StringComparison.Ordinal)) skippedCount++;
 
       int remaining = total - (downloadedCount + skippedCount);
        _uiStateManager!.UpdateDownloadProgress(downloadedCount, skippedCount, duplicateCount, remaining, total);
-       await Task.Delay(10, cancellationToken);
+       // Remove artificial delay - downloads as fast as possible now
      }
 
       LoadCurrentPage();

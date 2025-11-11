@@ -31,17 +31,17 @@ namespace WebsiteImagePilfer.Services
      item.Status = Status.Checking;
       var startTime = DateTime.Now;
 
-      var (urlToDownload, usedBackup) = await ResolveDownloadUrlAsync(item.Url, cancellationToken);
+ var (urlToDownload, usedBackup) = await ResolveDownloadUrlAsync(item.Url, cancellationToken).ConfigureAwait(false);
 
 // Use existing filename or extract from URL
-       if (string.IsNullOrEmpty(item.FileName) || item.FileName.StartsWith("image_"))
-    item.FileName = FileNameExtractor.ExtractFromUrl(urlToDownload);
+       if (string.IsNullOrEmpty(item.FileName) || item.FileName.StartsWith("image_", StringComparison.Ordinal))
+   item.FileName = FileNameExtractor.ExtractFromUrl(urlToDownload);
 
        // Check file type filters
          if (!PassesFileTypeFilter(item.FileName, out string? filterReason))
        {
     item.Status = filterReason!;
-        item.FileName = $"{item.FileName} (Filtered: {IOPath.GetExtension(item.FileName)})";
+  item.FileName = $"{item.FileName} (Filtered: {IOPath.GetExtension(item.FileName)})";
  return;
      }
 
@@ -54,31 +54,31 @@ return;
     }
 
    item.Status = Status.Downloading;
-       var downloadStart = DateTime.Now;
+   var downloadStart = DateTime.Now;
 
           // Download the image
-  var imageBytes = await _httpClient.GetByteArrayAsync(urlToDownload, cancellationToken);
+  var imageBytes = await _httpClient.GetByteArrayAsync(urlToDownload, cancellationToken).ConfigureAwait(false);
     var downloadElapsed = (DateTime.Now - downloadStart).TotalMilliseconds;
 
 // Filter by size if enabled
-    if (_settings.FilterBySize && imageBytes.Length < _settings.MinimumImageSize)
-       {
+  if (_settings.FilterBySize && imageBytes.Length < _settings.MinimumImageSize)
+ {
    item.Status = Status.SkippedSize;
        item.FileName = $"{item.FileName} ({imageBytes.Length} bytes)";
-        return;
-        }
+     return;
+   }
 
-await File.WriteAllBytesAsync(filePath, imageBytes, cancellationToken);
+await File.WriteAllBytesAsync(filePath, imageBytes, cancellationToken).ConfigureAwait(false);
 
 // Set thumbnail path if enabled
  if (_settings.ShowThumbnails)
     {
 try { item.ThumbnailPath = filePath; }
-        catch { /* Thumbnail generation failed, continue without it */ }
+   catch { /* Thumbnail generation failed, continue without it */ }
      }
 
         item.Status = usedBackup ? Status.Backup : Status.Done;
-     item.ErrorMessage = "";
+  item.ErrorMessage = "";
 
  var totalElapsed = (DateTime.Now - startTime).TotalMilliseconds;
    Logger.Info($"Downloaded {item.FileName} in {totalElapsed}ms (download: {downloadElapsed}ms)");
@@ -86,7 +86,7 @@ try { item.ThumbnailPath = filePath; }
             catch (OperationCanceledException)
     {
             item.Status = Status.Cancelled;
-      throw;
+  throw;
    }
    catch (HttpRequestException ex)
        {
@@ -97,10 +97,10 @@ item.ErrorMessage = $"Network error: {ex.Message}";
 catch (Exception ex)
     {
     item.Status = Status.Failed;
-        item.ErrorMessage = ex.Message;
-       Logger.Error($"Error downloading {item.FileName}", ex);
+   item.ErrorMessage = ex.Message;
+  Logger.Error($"Error downloading {item.FileName}", ex);
       }
-        }
+      }
 
         private async Task<(string url, bool usedBackup)> ResolveDownloadUrlAsync(string originalUrl, CancellationToken cancellationToken)
   {
@@ -134,20 +134,20 @@ catch (Exception ex)
   return kemonoResult;
 
    // Pattern 1: Remove "/thumbnail/" from path
-      if (previewUrl.Contains("/thumbnail/"))
+      if (previewUrl.Contains("/thumbnail/", StringComparison.Ordinal))
   {
 var fullResUrl = previewUrl.Replace("/thumbnail/", "/");
-         if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
+       if (await TestUrlExistsAsync(fullResUrl, cancellationToken).ConfigureAwait(false))
       return fullResUrl;
      }
 
    // Pattern 2: Remove size suffixes
 foreach (var pattern in Images.SizePatterns)
       {
-       if (previewUrl.Contains(pattern))
+  if (previewUrl.Contains(pattern, StringComparison.Ordinal))
   {
   var fullResUrl = previewUrl.Replace(pattern, "");
-       if (await TestUrlExistsAsync(fullResUrl, cancellationToken))
+       if (await TestUrlExistsAsync(fullResUrl, cancellationToken).ConfigureAwait(false))
   return fullResUrl;
     }
    }
@@ -155,7 +155,7 @@ foreach (var pattern in Images.SizePatterns)
   // No transformation needed/found - return original URL
         return previewUrl;
             }
-            catch (Exception ex)
+       catch (Exception ex)
  {
   Logger.Error($"TryFindFullResolutionUrlAsync exception", ex);
    return previewUrl;
@@ -164,13 +164,13 @@ foreach (var pattern in Images.SizePatterns)
 
    private bool IsKemonoUrl(string url, out string? result)
         {
- if (!url.Contains("kemono.cr"))
+ if (!url.Contains("kemono.cr", StringComparison.OrdinalIgnoreCase))
  {
-     result = null;
+  result = null;
   return false;
     }
 
-  if (url.Contains("/thumbnail/"))
+  if (url.Contains("/thumbnail/", StringComparison.Ordinal))
  {
   // Transform preview to full-res
     result = url.Replace("/thumbnail/", "/").Replace("img.kemono.cr", "n4.kemono.cr");
@@ -178,11 +178,11 @@ foreach (var pattern in Images.SizePatterns)
     return true;
    }
      
-            if (url.Contains("n4.kemono.cr") || url.Contains("n5.kemono.cr"))
+            if (url.Contains("n4.kemono.cr", StringComparison.Ordinal) || url.Contains("n5.kemono.cr", StringComparison.Ordinal))
      {
 // Already a full-res URL
  result = url;
-     Logger.Debug("Kemono.cr full-res URL detected (already full-res)");
+ Logger.Debug("Kemono.cr full-res URL detected (already full-res)");
        return true;
     }
 
@@ -194,18 +194,18 @@ foreach (var pattern in Images.SizePatterns)
         {
       try
      {
-     var request = new HttpRequestMessage(HttpMethod.Head, url);
+ var request = new HttpRequestMessage(HttpMethod.Head, url);
     using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(Network.HeadRequestTimeoutSeconds));
-   using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+      using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
-   var response = await _httpClient.SendAsync(request, linkedCts.Token);
+      var response = await _httpClient.SendAsync(request, linkedCts.Token).ConfigureAwait(false);
   return response.IsSuccessStatusCode;
 }
     catch
   {
  return false;
   }
-        }
+     }
 
         private bool PassesFileTypeFilter(string fileName, out string? filterReason)
         {
