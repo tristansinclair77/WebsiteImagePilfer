@@ -2,52 +2,52 @@ namespace WebsiteImagePilfer.Models
 {
     public class DownloadSettings
     {
-        public bool FilterBySize { get; set; } = false;
+        public bool FilterBySize { get; set; }
         public int MinimumImageSize { get; set; } = 5000;
         public bool ShowThumbnails { get; set; } = true;
-        public bool FilterJpgOnly { get; set; } = false;
-        public bool FilterPngOnly { get; set; } = false;
-     public bool SkipFullResolutionCheck { get; set; } = false;
-        public bool LimitScanCount { get; set; } = false;
+        public bool FilterJpgOnly { get; set; }
+        public bool FilterPngOnly { get; set; }
+        public bool SkipFullResolutionCheck { get; set; }
+        public bool LimitScanCount { get; set; }
         public int MaxImagesToScan { get; set; } = 20;
-public bool LoadPreviews { get; set; } = true;
-      public int ItemsPerPage { get; set; } = 50;
+        public bool LoadPreviews { get; set; } = true;
+        public int ItemsPerPage { get; set; } = 50;
 
         // Load settings from portable JSON
-      public void LoadFromPortableSettings()
+        public void LoadFromPortableSettings()
         {
-      var appSettings = PortableSettingsManager.LoadSettings();
-   FilterBySize = appSettings.FilterBySize;
+            var appSettings = PortableSettingsManager.LoadSettings();
+            FilterBySize = appSettings.FilterBySize;
             MinimumImageSize = appSettings.MinimumImageSize;
             ShowThumbnails = appSettings.ShowThumbnails;
-  LoadPreviews = appSettings.LoadPreviews;
+            LoadPreviews = appSettings.LoadPreviews;
             FilterJpgOnly = appSettings.FilterJpgOnly;
-       FilterPngOnly = appSettings.FilterPngOnly;
-       SkipFullResolutionCheck = appSettings.SkipFullResolutionCheck;
-     LimitScanCount = appSettings.LimitScanCount;
-   MaxImagesToScan = appSettings.MaxImagesToScan;
- ItemsPerPage = appSettings.ItemsPerPage;
+            FilterPngOnly = appSettings.FilterPngOnly;
+            SkipFullResolutionCheck = appSettings.SkipFullResolutionCheck;
+            LimitScanCount = appSettings.LimitScanCount;
+            MaxImagesToScan = appSettings.MaxImagesToScan;
+            ItemsPerPage = appSettings.ItemsPerPage;
         }
 
-      // Save settings to portable JSON
+        // Save settings to portable JSON
         public void SaveToPortableSettings(string downloadFolder, string lastUrl)
         {
-         var appSettings = new PortableSettingsManager.AppSettings
-        {
-            DownloadFolder = downloadFolder,
-    LastUrl = lastUrl,
-    FilterBySize = FilterBySize,
-    MinimumImageSize = MinimumImageSize,
-          ShowThumbnails = ShowThumbnails,
-        LoadPreviews = LoadPreviews,
-      FilterJpgOnly = FilterJpgOnly,
-         FilterPngOnly = FilterPngOnly,
-    SkipFullResolutionCheck = SkipFullResolutionCheck,
+            var appSettings = new PortableSettingsManager.AppSettings
+            {
+                DownloadFolder = downloadFolder,
+                LastUrl = lastUrl,
+                FilterBySize = FilterBySize,
+                MinimumImageSize = MinimumImageSize,
+                ShowThumbnails = ShowThumbnails,
+                LoadPreviews = LoadPreviews,
+                FilterJpgOnly = FilterJpgOnly,
+                FilterPngOnly = FilterPngOnly,
+                SkipFullResolutionCheck = SkipFullResolutionCheck,
                 LimitScanCount = LimitScanCount,
-       MaxImagesToScan = MaxImagesToScan,
-          ItemsPerPage = ItemsPerPage
-   };
-    PortableSettingsManager.SaveSettings(appSettings);
+                MaxImagesToScan = MaxImagesToScan,
+                ItemsPerPage = ItemsPerPage
+            };
+            PortableSettingsManager.SaveSettings(appSettings);
         }
     }
 }
