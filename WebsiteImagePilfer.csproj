@@ -9,6 +9,18 @@
     <ApplicationIcon>WIP_icon.ico</ApplicationIcon>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <!-- Default publish settings for a standalone app -->
+    <!-- Adjust RuntimeIdentifier as needed: win-x64, win-x86, win-arm64 -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>false</PublishTrimmed> <!-- Trimming can break WPF/reflection; enable only after thorough testing -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- CommunityToolkit.Mvvm package removed - using custom MVVM implementation -->
     <!-- Custom implementations: ViewModelBase, RelayCommand, AsyncRelayCommand -->
@@ -18,6 +30,21 @@
     <PackageReference Include="Selenium.WebDriver" Version="4.38.0" />
     <PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="142.0.7444.6100" />
     <PackageReference Include="System.Text.Json" Version="9.0.10" />
+  </ItemGroup>
+
+  <!-- Exclude test files accidentally present under the project folder so they aren't compiled into the app project -->
+  <ItemGroup>
+    <Compile Remove="WebsiteImagePilfer.Tests\**\*.cs" />
+    <EmbeddedResource Remove="WebsiteImagePilfer.Tests\**\*" />
+    <None Remove="WebsiteImagePilfer.Tests\**\*" />
+  </ItemGroup>
+
+  <!-- Ensure content (icons, other files) are published -->
+  <ItemGroup>
+    <Content Update="WIP_icon.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
